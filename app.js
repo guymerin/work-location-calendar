@@ -571,7 +571,22 @@ function updateStats() {
         });
         
         // Calculate average weekly office days (only weeks with data)
-        const weeksWithData = weeks.filter(w => w.hasData);
+        // Exclude current week if it doesn't have data through Friday
+        const today = new Date();
+        const currentWeekMonday = getMondayOfWeek(today);
+        const currentWeekFriday = new Date(currentWeekMonday);
+        currentWeekFriday.setDate(currentWeekFriday.getDate() + 4); // Friday is 4 days after Monday
+        const currentWeekFridayKey = formatDateKey(currentWeekFriday);
+        const hasCurrentWeekFridayData = !!data[currentWeekFridayKey];
+        
+        const weeksWithData = weeks.filter(w => {
+            // Exclude current week if it doesn't have Friday data
+            if (w.weekStart.getTime() === currentWeekMonday.getTime()) {
+                return hasCurrentWeekFridayData && w.hasData;
+            }
+            return w.hasData;
+        });
+        
         let avgWeeklyOffice = 0;
         if (weeksWithData.length > 0) {
             const totalOfficeDays = weeksWithData.reduce((sum, w) => sum + w.officeDays, 0);
@@ -579,7 +594,6 @@ function updateStats() {
         }
         
         // Calculate BELT: Best 8 weeks from last 12 weeks
-        const today = new Date();
         const todayMonday = getMondayOfWeek(today);
         const twelveWeeksAgo = new Date(todayMonday);
         twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 11 * 7); // 11 weeks back (12 weeks total)
