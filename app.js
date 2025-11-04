@@ -350,41 +350,52 @@ function addWeekSummaries(year, month, startingDayOfWeek, daysInMonth) {
         const allDays = document.querySelectorAll('.calendar-day');
         const data = doc.exists ? doc.data() : {};
         
-        // Group days into weeks
+        // Group days into weeks based on calendar grid position (not date's day of week)
+        // Sunday is always in column 7, which is index 6, 13, 20, 27, etc. (index % 7 === 6)
         let currentWeek = [];
         let weekStartIndex = 0;
         
         allDays.forEach((dayElement, index) => {
             const dayNumber = dayElement.querySelector('.day-number');
-            if (!dayNumber) {
-                // Empty cell - don't count it
-                return;
+            
+            // Check if this is Sunday column in the grid (7th column, index % 7 === 6)
+            const isSundayColumn = (index % 7) === 6;
+            
+            if (dayNumber) {
+                const day = parseInt(dayNumber.textContent);
+                if (!isNaN(day)) {
+                    // Check if this is from next month (has other-month class)
+                    const isNextMonth = dayElement.classList.contains('other-month');
+                    let date;
+                    if (isNextMonth) {
+                        const nextMonth = month === 11 ? 0 : month + 1;
+                        const nextYear = month === 11 ? year + 1 : year;
+                        date = new Date(nextYear, nextMonth, day);
+                    } else {
+                        date = new Date(year, month, day);
+                    }
+                    
+                    // Get location for this day
+                    const dateKey = formatDateKey(date);
+                    const explicitLocation = data[dateKey]; // The actual value from Firestore (or undefined)
+                    
+                    // Handle weekend defaults for display
+                    let location = explicitLocation;
+                    if (!location) {
+                        const dayOfWeek = date.getDay();
+                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                        location = isWeekend ? 'home' : 'none';
+                    }
+                    
+                    currentWeek.push({ location, explicitLocation, date, element: dayElement });
+                }
+            } else {
+                // Empty cell - add placeholder but don't count it
+                currentWeek.push({ location: null, explicitLocation: null, date: null, element: dayElement });
             }
             
-            const day = parseInt(dayNumber.textContent);
-            if (isNaN(day)) return;
-            
-            const date = new Date(year, month, day);
-            const dayOfWeek = date.getDay();
-            
-            // Check if this is the last day of a week (Sunday)
-            const isLastDayOfWeek = dayOfWeek === 0;
-            
-            // Get location for this day
-            const dateKey = formatDateKey(date);
-            let location = data[dateKey];
-            
-            // Handle weekend defaults
-            if (!location) {
-                const dayOfWeek = date.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                location = isWeekend ? 'home' : 'none';
-            }
-            
-            currentWeek.push({ location, element: dayElement });
-            
-            // If this is Sunday (end of week), add summary badge
-            if (isLastDayOfWeek || index === allDays.length - 1) {
+            // If this is Sunday column (7th column) or last cell, add summary badge
+            if (isSundayColumn || index === allDays.length - 1) {
                 countAndDisplayWeekSummary(currentWeek, weekStartIndex);
                 currentWeek = [];
                 weekStartIndex = index + 1;
@@ -396,32 +407,49 @@ function addWeekSummaries(year, month, startingDayOfWeek, daysInMonth) {
 function countAndDisplayWeekSummary(weekDays, startIndex) {
     // Count office days (including next month's days)
     let officeDays = 0;
-    let hasValidDays = false;
+    let hasExplicitWeekdayData = false; // Check if at least one weekday (Mon-Fri) has explicit data
     
-    weekDays.forEach(({ location, element }) => {
+    weekDays.forEach(({ location, explicitLocation, date, element }) => {
         // Count all days in the week, even if they're from next month
-        if (element.querySelector('.day-number')) {
-            hasValidDays = true;
+        // Only count if location is not null (skip empty placeholder cells)
+        if (location !== null && element.querySelector('.day-number')) {
             if (location === 'office') {
                 officeDays++;
+            }
+            
+            // Check if it's a weekday (Mon-Fri) with an explicit location set
+            if (date) {
+                const dayOfWeek = date.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday to Friday
+                    // Only count if explicitly set in Firestore (not defaulted)
+                    if (explicitLocation === 'home' || explicitLocation === 'office') {
+                        hasExplicitWeekdayData = true;
+                    }
+                }
             }
         }
     });
     
-    // Always show badge if there are valid days in the week
-    if (hasValidDays) {
-        // Find the last day of the week (Sunday)
-        const allDays = document.querySelectorAll('.calendar-day');
-        const weekEndCell = allDays[startIndex + weekDays.length - 1];
+    // Only show badge if there's at least one weekday (Mon-Fri) with explicit data
+    if (hasExplicitWeekdayData) {
+        // Find the Sunday cell (last cell in the week array, which should be at Sunday column)
+        // The week array contains up to 7 elements, and the last one should be Sunday
+        const sundayCell = weekDays[weekDays.length - 1]?.element;
         
-        if (weekEndCell) {
+        if (sundayCell) {
+            // Remove any existing badge first (in case of re-render)
+            const existingBadge = sundayCell.querySelector('.week-summary-badge');
+            if (existingBadge) {
+                existingBadge.remove();
+            }
+            
             // Create badge
             const badge = document.createElement('div');
             badge.className = 'week-summary-badge';
             badge.textContent = `${officeDays} office`;
             
             // Append to the Sunday cell
-            weekEndCell.appendChild(badge);
+            sundayCell.appendChild(badge);
         }
     }
 }

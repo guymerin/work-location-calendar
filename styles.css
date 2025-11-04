@@ -301,6 +301,17 @@ h1 {
     font-size: 0.7rem;
     font-weight: 600;
     white-space: nowrap;
+    opacity: 1 !important; /* Always show badge at full opacity, even in other-month cells */
+    z-index: 10; /* Ensure badge is above other elements */
+    transform: translateZ(0); /* Create new stacking context */
+}
+
+/* Override opacity for badge inside other-month cells by compensating with filter */
+.calendar-day.other-month .week-summary-badge {
+    opacity: 1 !important;
+    filter: opacity(3.33) !important; /* Compensate for parent's 0.3 opacity (0.3 * 3.33 ≈ 1.0) */
+    background: #2196f3 !important; /* Ensure full color */
+    color: white !important;
 }
 
 .calendar-day.today {
