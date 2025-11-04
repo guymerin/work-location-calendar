@@ -76,6 +76,9 @@ function initializeApp() {
     
     // Initialize modal listeners
     initializeModalListeners();
+    
+    // Update stats (even if no user, to show "-")
+    updateStats();
 }
 
 function initializeModalListeners() {
@@ -108,6 +111,8 @@ function setUserName() {
     currentUser = name;
     localStorage.setItem('currentUser', currentUser);
     updateUserStatus();
+    renderCalendar(); // This will also update stats
+    updateStats(); // Also update stats directly
 }
 
 function updateUserStatus() {
@@ -183,6 +188,9 @@ function renderCalendar() {
     
     // Add week summary badges after rendering is complete
     addWeekSummaries(year, month, startingDayOfWeek, daysInMonth);
+    
+    // Update stats
+    updateStats();
 }
 
 function createDayElement(day, year, month) {
@@ -418,11 +426,138 @@ function countAndDisplayWeekSummary(weekDays, startIndex) {
     }
 }
 
+// Helper function to get Monday of the week for a given date
+function getMondayOfWeek(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+    return new Date(d.setDate(diff));
+}
+
+// Helper function to parse date string (YYYY-MM-DD) to Date object
+function parseDateKey(dateKey) {
+    const [year, month, day] = dateKey.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+// Calculate and display stats
+function updateStats() {
+    // Always update UI elements, even if no user or data
+    const avgElement = document.getElementById('avgWeeklyOffice');
+    const beltElement = document.getElementById('beltValue');
+    
+    // Default to "-" if no user or db
+    if (!currentUser || !db) {
+        if (avgElement) avgElement.textContent = '-';
+        if (beltElement) beltElement.textContent = '-';
+        return;
+    }
+    
+    db.collection('users').doc(currentUser).get().then(doc => {
+        const data = doc.exists ? doc.data() : {};
+        
+        // Group all days into weeks (only explicitly saved data)
+        const weeksMap = new Map(); // Map of week key (Monday date string) to week data
+        
+        // Process all dates in the data
+        Object.keys(data).forEach(dateKey => {
+            // Skip null values (cleared locations)
+            if (!data[dateKey]) return;
+            
+            const date = parseDateKey(dateKey);
+            if (isNaN(date.getTime())) return; // Invalid date
+            
+            const monday = getMondayOfWeek(date);
+            const weekKey = formatDateKey(monday);
+            
+            if (!weeksMap.has(weekKey)) {
+                weeksMap.set(weekKey, {
+                    weekStart: monday,
+                    days: new Map() // Map of date key to location
+                });
+            }
+            
+            weeksMap.get(weekKey).days.set(dateKey, data[dateKey]);
+        });
+        
+        // Convert weeks map to array and calculate office days per week
+        const weeks = Array.from(weeksMap.values()).map(week => {
+            let officeDays = 0;
+            let hasData = false; // Track if week has any home or office days
+            
+            week.days.forEach(location => {
+                if (location === 'home' || location === 'office') {
+                    hasData = true;
+                }
+                if (location === 'office') {
+                    officeDays++;
+                }
+            });
+            
+            return {
+                weekStart: week.weekStart,
+                officeDays: officeDays,
+                hasData: hasData
+            };
+        });
+        
+        // Calculate average weekly office days (only weeks with data)
+        const weeksWithData = weeks.filter(w => w.hasData);
+        let avgWeeklyOffice = 0;
+        if (weeksWithData.length > 0) {
+            const totalOfficeDays = weeksWithData.reduce((sum, w) => sum + w.officeDays, 0);
+            avgWeeklyOffice = totalOfficeDays / weeksWithData.length;
+        }
+        
+        // Calculate BELT: Best 8 weeks from last 12 weeks
+        const today = new Date();
+        const todayMonday = getMondayOfWeek(today);
+        const twelveWeeksAgo = new Date(todayMonday);
+        twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 11 * 7); // 11 weeks back (12 weeks total)
+        
+        const last12Weeks = weeks.filter(w => {
+            return w.weekStart >= twelveWeeksAgo && w.weekStart <= todayMonday;
+        });
+        
+        // Sort by office days (descending) and take best 8
+        const best8Weeks = last12Weeks
+            .filter(w => w.hasData)
+            .sort((a, b) => b.officeDays - a.officeDays)
+            .slice(0, 8);
+        
+        let beltAverage = 0;
+        if (best8Weeks.length > 0) {
+            const totalOfficeDays = best8Weeks.reduce((sum, w) => sum + w.officeDays, 0);
+            beltAverage = totalOfficeDays / best8Weeks.length;
+        }
+        
+        // Update UI
+        if (avgElement) {
+            avgElement.textContent = weeksWithData.length > 0 
+                ? avgWeeklyOffice.toFixed(2) 
+                : '-';
+        }
+        
+        if (beltElement) {
+            beltElement.textContent = best8Weeks.length > 0 
+                ? beltAverage.toFixed(2) 
+                : '-';
+        }
+    }).catch(error => {
+        console.error('Error calculating stats:', error);
+        // On error, show "-"
+        if (avgElement) avgElement.textContent = '-';
+        if (beltElement) beltElement.textContent = '-';
+    });
+}
+
 // Real-time updates - listen for changes from other devices
-if (currentUser) {
+if (currentUser && db) {
     db.collection('users').doc(currentUser).onSnapshot(doc => {
         if (doc.exists) {
-            renderCalendar(); // Refresh calendar when data changes
+            renderCalendar(); // Refresh calendar when data changes (which also updates stats)
+        } else {
+            updateStats(); // Update stats even if no data exists
         }
     });
 }
