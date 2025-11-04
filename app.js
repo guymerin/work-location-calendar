@@ -149,15 +149,32 @@ function renderCalendar() {
     const calendarGrid = document.getElementById('calendarGrid');
     calendarGrid.innerHTML = '';
 
-    // Add empty cells for days before the first day of the month
+    // Calculate previous month's days to show
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const prevMonthLastDay = new Date(year, month, 0); // Last day of previous month
+    const daysInPrevMonth = prevMonthLastDay.getDate();
+
+    // Add previous month's days to complete the first week
+    const today = new Date();
     for (let i = 0; i < startingDayOfWeek; i++) {
-        const emptyDay = createDayElement(null, year, month);
-        emptyDay.classList.add('other-month');
-        calendarGrid.appendChild(emptyDay);
+        const prevDay = daysInPrevMonth - startingDayOfWeek + i + 1;
+        const prevDate = new Date(prevYear, prevMonth, prevDay);
+        const prevDayElement = createDayElement(prevDay, prevYear, prevMonth);
+        prevDayElement.classList.add('other-month');
+        
+        // Highlight today if it falls in previous month
+        if (prevDate.toDateString() === today.toDateString()) {
+            prevDayElement.classList.add('today');
+        }
+        
+        // Load location data for previous month day
+        loadDayLocation(prevYear, prevMonth, prevDay, prevDayElement);
+        
+        calendarGrid.appendChild(prevDayElement);
     }
 
-    // Add days of the month
-    const today = new Date();
+    // Add days of the current month
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
         const dayElement = createDayElement(day, year, month);
@@ -180,8 +197,18 @@ function renderCalendar() {
         const nextMonth = month === 11 ? 0 : month + 1;
         const nextYear = month === 11 ? year + 1 : year;
         for (let i = 1; i <= remainingCells; i++) {
+            const nextDate = new Date(nextYear, nextMonth, i);
             const nextDayElement = createDayElement(i, nextYear, nextMonth);
             nextDayElement.classList.add('other-month');
+            
+            // Highlight today if it falls in next month
+            if (nextDate.toDateString() === today.toDateString()) {
+                nextDayElement.classList.add('today');
+            }
+            
+            // Load location data for next month day
+            loadDayLocation(nextYear, nextMonth, i, nextDayElement);
+            
             calendarGrid.appendChild(nextDayElement);
         }
     }
@@ -345,6 +372,12 @@ function formatDateKey(date) {
 function addWeekSummaries(year, month, startingDayOfWeek, daysInMonth) {
     if (!currentUser) return;
     
+    // Calculate previous and next month info
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    
     // Get all user data once
     db.collection('users').doc(currentUser).get().then(doc => {
         const allDays = document.querySelectorAll('.calendar-day');
@@ -364,14 +397,22 @@ function addWeekSummaries(year, month, startingDayOfWeek, daysInMonth) {
             if (dayNumber) {
                 const day = parseInt(dayNumber.textContent);
                 if (!isNaN(day)) {
-                    // Check if this is from next month (has other-month class)
-                    const isNextMonth = dayElement.classList.contains('other-month');
+                    // Determine if this is from previous month, current month, or next month
+                    const isOtherMonth = dayElement.classList.contains('other-month');
                     let date;
-                    if (isNextMonth) {
-                        const nextMonth = month === 11 ? 0 : month + 1;
-                        const nextYear = month === 11 ? year + 1 : year;
-                        date = new Date(nextYear, nextMonth, day);
+                    
+                    if (isOtherMonth) {
+                        // First startingDayOfWeek cells with other-month are from previous month
+                        // The rest are from next month
+                        if (index < startingDayOfWeek) {
+                            // Previous month
+                            date = new Date(prevYear, prevMonth, day);
+                        } else {
+                            // Next month
+                            date = new Date(nextYear, nextMonth, day);
+                        }
                     } else {
+                        // Current month
                         date = new Date(year, month, day);
                     }
                     
@@ -405,12 +446,12 @@ function addWeekSummaries(year, month, startingDayOfWeek, daysInMonth) {
 }
 
 function countAndDisplayWeekSummary(weekDays, startIndex) {
-    // Count office days (including next month's days)
+    // Count office days (including previous and next month's days)
     let officeDays = 0;
     let hasExplicitWeekdayData = false; // Check if at least one weekday (Mon-Fri) has explicit data
     
     weekDays.forEach(({ location, explicitLocation, date, element }) => {
-        // Count all days in the week, even if they're from next month
+        // Count all days in the week, even if they're from previous or next month
         // Only count if location is not null (skip empty placeholder cells)
         if (location !== null && element.querySelector('.day-number')) {
             if (location === 'office') {
