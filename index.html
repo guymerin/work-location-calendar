@@ -18,6 +18,12 @@
             <div class="user-section">
                 <input type="text" id="userName" placeholder="Enter your name" maxlength="20">
                 <button id="setUserName">Set Name</button>
+                <button id="stravaConnectBtn" class="strava-btn" style="display: none;">
+                    <span>🏃</span> Connect Strava
+                </button>
+                <button id="stravaDisconnectBtn" class="strava-btn disconnect" style="display: none;">
+                    <span>🏃</span> Disconnect Strava
+                </button>
             </div>
         </header>
 
@@ -73,6 +79,49 @@
                     <span class="btn-icon">❌</span>
                     <span>Clear</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="stravaModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="stravaModalClose">&times;</span>
+            <h3>Connect Strava</h3>
+            <div class="strava-connect-section">
+                <p>To connect your Strava account, you'll need to get an access token:</p>
+                <ol style="text-align: left; margin: 20px 0; padding-left: 20px; line-height: 1.8;">
+                    <li>Go to <a href="https://www.strava.com/settings/api" target="_blank">Strava API Settings</a> and note your <strong>Client ID</strong></li>
+                    <li>Visit this URL (replace YOUR_CLIENT_ID with your actual Client ID):
+                        <br><code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 5px; font-size: 0.9em;">
+                            https://www.strava.com/oauth/authorize?client_id=YOUR_CLIENT_ID&response_type=code&redirect_uri=https://guymerin.github.io/work-location-calendar/&approval_prompt=force&scope=activity:read_all
+                        </code>
+                    </li>
+                    <li>Authorize the app - you'll be redirected back to your site</li>
+                    <li>Copy the <code>code</code> parameter from the URL in your browser's address bar</li>
+                    <li>Use a tool like <a href="https://www.postman.com/" target="_blank">Postman</a> or <a href="https://httpie.io/" target="_blank">HTTPie</a> to exchange the code for a token:
+                        <br><small style="color: #666;">POST to https://www.strava.com/oauth/token with: client_id, client_secret, code, grant_type=authorization_code</small>
+                    </li>
+                    <li>Paste the <strong>access_token</strong> from the response below</li>
+                </ol>
+                <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 8px; font-size: 0.9rem; color: #856404;">
+                    <strong>💡 Easier Alternative:</strong> Use <a href="https://www.strava.com/settings/api" target="_blank">Strava's API playground</a> to test API calls and get a temporary token, or use browser dev tools to extract the token from a successful API call.
+                </p>
+                <div style="margin: 20px 0;">
+                    <label for="stravaTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Access Token:</label>
+                    <input type="text" id="stravaTokenInput" placeholder="Paste your Strava access token here" 
+                           style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                </div>
+                <div style="margin: 20px 0;">
+                    <label for="stravaRefreshTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Refresh Token (optional):</label>
+                    <input type="text" id="stravaRefreshTokenInput" placeholder="Paste your refresh token (optional)" 
+                           style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                </div>
+                <button id="saveStravaToken" class="location-btn office-btn" style="width: 100%; margin-top: 10px;">
+                    Save Token
+                </button>
+                <p style="margin-top: 15px; font-size: 0.85rem; color: #666;">
+                    <strong>Note:</strong> Strava access tokens expire after 6 hours. If your workouts stop showing, simply reconnect by clicking "Connect Strava" again and pasting a new token. The app will automatically detect when your token expires and show the connect button again.
+                </p>
             </div>
         </div>
     </div>

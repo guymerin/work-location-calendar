@@ -84,6 +84,33 @@ h1 {
     background: #5568d3;
 }
 
+.strava-btn {
+    padding: 10px 20px;
+    background: #fc4c02;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.strava-btn:hover {
+    background: #e03d00;
+}
+
+.strava-btn.disconnect {
+    background: #f44336;
+}
+
+.strava-btn.disconnect:hover {
+    background: #da190b;
+}
+
 .calendar-controls {
     display: flex;
     justify-content: space-between;
@@ -337,6 +364,28 @@ h1 {
 
 .location-indicator.office {
     color: #2196f3;
+}
+
+.workout-indicator {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 1rem;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 5;
+    cursor: help;
+}
+
+.workout-indicator:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .legend {

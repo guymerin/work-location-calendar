@@ -45,11 +45,96 @@ try {
 let currentDate = new Date();
 let currentUser = localStorage.getItem('currentUser') || '';
 let selectedDate = null;
+let stravaActivities = {}; // Cache of activities by date (YYYY-MM-DD)
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if we're returning from Strava OAuth
+    handleStravaOAuthCallback();
     initializeApp();
 });
+
+// Handle OAuth callback from Strava
+function handleStravaOAuthCallback() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const error = urlParams.get('error');
+    
+    if (error) {
+        console.error('Strava OAuth error:', error);
+        alert(`Strava authorization failed: ${error}`);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+    }
+    
+    if (code) {
+        // Show the code to the user with instructions
+        const modal = document.getElementById('stravaModal');
+        if (modal) {
+            modal.style.display = 'block';
+            const tokenInput = document.getElementById('stravaTokenInput');
+            if (tokenInput) {
+                tokenInput.placeholder = 'Authorization code received! Follow the steps below to exchange it for a token.';
+            }
+            
+            // Show instructions for exchanging code
+            const instructions = document.querySelector('.strava-connect-section');
+            if (instructions) {
+                instructions.innerHTML = `
+                    <p style="color: #4caf50; font-weight: 600;">✅ Authorization code received!</p>
+                    <p>Your authorization code: <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${code}</code></p>
+                    <p>To exchange this code for an access token, you need to make a POST request:</p>
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; font-family: monospace; font-size: 0.9em;">
+                        <strong>POST</strong> https://www.strava.com/oauth/token<br><br>
+                        <strong>Body (form-data or JSON):</strong><br>
+                        client_id: YOUR_CLIENT_ID<br>
+                        client_secret: YOUR_CLIENT_SECRET<br>
+                        code: ${code}<br>
+                        grant_type: authorization_code
+                    </div>
+                    <p>You can use <a href="https://www.postman.com/" target="_blank">Postman</a>, <a href="https://httpie.io/" target="_blank">HTTPie</a>, or curl to make this request.</p>
+                    <p style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 0.9rem;">
+                        <strong>Example with curl:</strong><br>
+                        <code style="font-size: 0.85em; display: block; margin-top: 5px;">
+                            curl -X POST https://www.strava.com/oauth/token \\<br>
+                            &nbsp;&nbsp;-d client_id=YOUR_CLIENT_ID \\<br>
+                            &nbsp;&nbsp;-d client_secret=YOUR_CLIENT_SECRET \\<br>
+                            &nbsp;&nbsp;-d code=${code} \\<br>
+                            &nbsp;&nbsp;-d grant_type=authorization_code
+                        </code>
+                    </p>
+                    <p>Once you get the response, paste the <strong>access_token</strong> below:</p>
+                    <div style="margin: 20px 0;">
+                        <label for="stravaTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Access Token:</label>
+                        <input type="text" id="stravaTokenInput" placeholder="Paste your access token here" 
+                               style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                    </div>
+                    <button id="saveStravaToken" class="location-btn office-btn" style="width: 100%; margin-top: 10px;">
+                        Save Token
+                    </button>
+                `;
+                
+                // Re-initialize the save button listener
+                const saveBtn = document.getElementById('saveStravaToken');
+                if (saveBtn) {
+                    saveBtn.replaceWith(saveBtn.cloneNode(true));
+                    document.getElementById('saveStravaToken').addEventListener('click', () => {
+                        const token = document.getElementById('stravaTokenInput').value.trim();
+                        if (token) {
+                            saveStravaToken(token, null);
+                        } else {
+                            alert('Please enter an access token');
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
 
 function initializeApp() {
     // Load saved user name
@@ -76,6 +161,14 @@ function initializeApp() {
     
     // Initialize modal listeners
     initializeModalListeners();
+    
+    // Initialize Strava buttons
+    initializeStravaButtons();
+    
+    // Load Strava connection status
+    if (currentUser) {
+        checkStravaConnection();
+    }
     
     // Update stats (even if no user, to show "-")
     updateStats();
@@ -111,6 +204,12 @@ function setUserName() {
     currentUser = name;
     localStorage.setItem('currentUser', currentUser);
     updateUserStatus();
+    
+    // Check Strava connection status after setting user
+    setTimeout(() => {
+        checkStravaConnection();
+    }, 100);
+    
     renderCalendar(); // This will also update stats
     updateStats(); // Also update stats directly
 }
@@ -171,6 +270,9 @@ function renderCalendar() {
         // Load location data for previous month day
         loadDayLocation(prevYear, prevMonth, prevDay, prevDayElement);
         
+        // Load Strava workout data
+        loadStravaWorkout(prevYear, prevMonth, prevDay, prevDayElement);
+        
         calendarGrid.appendChild(prevDayElement);
     }
 
@@ -186,6 +288,9 @@ function renderCalendar() {
 
         // Load location data for this day
         loadDayLocation(year, month, day, dayElement);
+        
+        // Load Strava workout data
+        loadStravaWorkout(year, month, day, dayElement);
 
         calendarGrid.appendChild(dayElement);
     }
@@ -193,7 +298,7 @@ function renderCalendar() {
     // Add next month's days for remaining cells in the last week
     const totalCells = startingDayOfWeek + daysInMonth;
     const remainingCells = 7 - (totalCells % 7);
-    if (remainingCells < 7) {
+    if (remainingCells < 7 && remainingCells > 0) {
         const nextMonth = month === 11 ? 0 : month + 1;
         const nextYear = month === 11 ? year + 1 : year;
         for (let i = 1; i <= remainingCells; i++) {
@@ -208,6 +313,41 @@ function renderCalendar() {
             
             // Load location data for next month day
             loadDayLocation(nextYear, nextMonth, i, nextDayElement);
+            
+            calendarGrid.appendChild(nextDayElement);
+        }
+    }
+    
+    // Ensure we always show complete weeks (at least 6 weeks = 42 cells)
+    // If we have less than 42 cells, add more days from next month
+    const currentCellCount = calendarGrid.children.length;
+    if (currentCellCount < 42) {
+        const nextMonth = month === 11 ? 0 : month + 1;
+        const nextYear = month === 11 ? year + 1 : year;
+        const nextMonthFirstDay = new Date(nextYear, nextMonth, 1);
+        const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+        
+        // Calculate how many days we've already added from next month
+        const alreadyAddedNextMonthDays = remainingCells > 0 && remainingCells < 7 ? remainingCells : 0;
+        const startDay = alreadyAddedNextMonthDays + 1;
+        const cellsToAdd = 42 - currentCellCount;
+        
+        for (let i = 0; i < cellsToAdd && (startDay + i) <= daysInNextMonth; i++) {
+            const dayNum = startDay + i;
+            const nextDate = new Date(nextYear, nextMonth, dayNum);
+            const nextDayElement = createDayElement(dayNum, nextYear, nextMonth);
+            nextDayElement.classList.add('other-month');
+            
+            // Highlight today if it falls in next month
+            if (nextDate.toDateString() === today.toDateString()) {
+                nextDayElement.classList.add('today');
+            }
+            
+            // Load location data for next month day
+            loadDayLocation(nextYear, nextMonth, dayNum, nextDayElement);
+            
+            // Load Strava workout data
+            loadStravaWorkout(nextYear, nextMonth, dayNum, nextDayElement);
             
             calendarGrid.appendChild(nextDayElement);
         }
@@ -228,6 +368,7 @@ function createDayElement(day, year, month) {
         dayDiv.innerHTML = `
             <div class="day-number">${day}</div>
             <div class="location-indicator" data-location="none"></div>
+            <div class="workout-indicator" style="display: none;"></div>
         `;
         
         dayDiv.addEventListener('click', () => {
@@ -643,5 +784,297 @@ if (currentUser && db) {
             updateStats(); // Update stats even if no data exists
         }
     });
+}
+
+// ==================== STRAVA INTEGRATION ====================
+
+function initializeStravaButtons() {
+    const connectBtn = document.getElementById('stravaConnectBtn');
+    const disconnectBtn = document.getElementById('stravaDisconnectBtn');
+    const stravaModal = document.getElementById('stravaModal');
+    const stravaModalClose = document.getElementById('stravaModalClose');
+    const saveTokenBtn = document.getElementById('saveStravaToken');
+    
+    if (connectBtn) {
+        connectBtn.addEventListener('click', () => {
+            if (!currentUser) {
+                alert('Please enter your name first');
+                return;
+            }
+            stravaModal.style.display = 'block';
+        });
+    }
+    
+    if (disconnectBtn) {
+        disconnectBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to disconnect Strava?')) {
+                disconnectStrava();
+            }
+        });
+    }
+    
+    if (stravaModalClose) {
+        stravaModalClose.addEventListener('click', () => {
+            stravaModal.style.display = 'none';
+        });
+    }
+    
+    if (saveTokenBtn) {
+        saveTokenBtn.addEventListener('click', () => {
+            const token = document.getElementById('stravaTokenInput').value.trim();
+            const refreshToken = document.getElementById('stravaRefreshTokenInput').value.trim();
+            
+            if (!token) {
+                alert('Please enter an access token');
+                return;
+            }
+            
+            saveStravaToken(token, refreshToken);
+        });
+    }
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === stravaModal) {
+            stravaModal.style.display = 'none';
+        }
+    });
+}
+
+function checkStravaConnection() {
+    if (!currentUser || !db) {
+        const connectBtn = document.getElementById('stravaConnectBtn');
+        const disconnectBtn = document.getElementById('stravaDisconnectBtn');
+        if (connectBtn) connectBtn.style.display = 'none';
+        if (disconnectBtn) disconnectBtn.style.display = 'none';
+        return;
+    }
+    
+    db.collection('users').doc(currentUser).get().then(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            const hasToken = data.stravaAccessToken && data.stravaAccessToken.trim() !== '';
+            
+            console.log('Checking Strava connection - hasToken:', hasToken);
+            
+            const connectBtn = document.getElementById('stravaConnectBtn');
+            const disconnectBtn = document.getElementById('stravaDisconnectBtn');
+            
+            if (connectBtn) {
+                connectBtn.style.display = hasToken ? 'none' : 'inline-flex';
+            }
+            if (disconnectBtn) {
+                disconnectBtn.style.display = hasToken ? 'inline-flex' : 'none';
+            }
+            
+            if (hasToken) {
+                console.log('Token found, fetching activities...');
+                // Fetch activities
+                fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
+            } else {
+                console.log('No token found');
+            }
+        } else {
+            console.log('No user document found');
+            const connectBtn = document.getElementById('stravaConnectBtn');
+            const disconnectBtn = document.getElementById('stravaDisconnectBtn');
+            if (connectBtn) connectBtn.style.display = 'inline-flex';
+            if (disconnectBtn) disconnectBtn.style.display = 'none';
+        }
+    }).catch(error => {
+        console.error('Error checking Strava connection:', error);
+    });
+}
+
+function saveStravaToken(accessToken, refreshToken) {
+    if (!currentUser || !db) {
+        alert('Please enter your name first');
+        return;
+    }
+    
+    if (!accessToken || accessToken.trim() === '') {
+        alert('Please enter a valid access token');
+        return;
+    }
+    
+    const userDocRef = db.collection('users').doc(currentUser);
+    
+    userDocRef.get().then(doc => {
+        const data = doc.exists ? doc.data() : {};
+        data.stravaAccessToken = accessToken.trim();
+        if (refreshToken && refreshToken.trim() !== '') {
+            data.stravaRefreshToken = refreshToken.trim();
+        }
+        
+        userDocRef.set(data, { merge: true })
+            .then(() => {
+                console.log('Strava token saved successfully');
+                document.getElementById('stravaModal').style.display = 'none';
+                document.getElementById('stravaTokenInput').value = '';
+                document.getElementById('stravaRefreshTokenInput').value = '';
+                
+                // Update UI immediately
+                document.getElementById('stravaConnectBtn').style.display = 'none';
+                document.getElementById('stravaDisconnectBtn').style.display = 'inline-flex';
+                
+                // Fetch activities
+                fetchStravaActivities(accessToken.trim(), refreshToken ? refreshToken.trim() : null);
+                
+                // Also check connection to ensure consistency
+                setTimeout(() => {
+                    checkStravaConnection();
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Error saving Strava token:', error);
+                alert('Error saving token. Please try again.');
+            });
+    }).catch(error => {
+        console.error('Error accessing database:', error);
+        alert('Error accessing database. Please try again.');
+    });
+}
+
+function disconnectStrava(silent = false) {
+    if (!currentUser || !db) return;
+    
+    const userDocRef = db.collection('users').doc(currentUser);
+    
+    userDocRef.get().then(doc => {
+        const data = doc.exists ? doc.data() : {};
+        data.stravaAccessToken = null;
+        data.stravaRefreshToken = null;
+        
+        userDocRef.set(data, { merge: true })
+            .then(() => {
+                stravaActivities = {};
+                checkStravaConnection();
+                renderCalendar();
+                if (!silent) {
+                    // Only show message if user manually disconnected
+                    console.log('Strava disconnected');
+                }
+            })
+            .catch(error => {
+                console.error('Error disconnecting Strava:', error);
+                if (!silent) {
+                    alert('Error disconnecting Strava. Please try again.');
+                }
+            });
+    });
+}
+
+async function fetchStravaActivities(accessToken, refreshToken) {
+    if (!accessToken || accessToken.trim() === '') {
+        console.log('No access token provided');
+        return;
+    }
+    
+    console.log('Fetching Strava activities...');
+    
+    try {
+        // Calculate date range (last 3 months and next month)
+        const now = new Date();
+        const threeMonthsAgo = new Date(now);
+        threeMonthsAgo.setMonth(now.getMonth() - 3);
+        const nextMonth = new Date(now);
+        nextMonth.setMonth(now.getMonth() + 1);
+        
+        const after = Math.floor(threeMonthsAgo.getTime() / 1000);
+        const before = Math.floor(nextMonth.getTime() / 1000);
+        
+        // Fetch activities from Strava API
+        const response = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&before=${before}&per_page=200`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken.trim()}`
+            }
+        });
+        
+        if (response.status === 401) {
+            // Token expired or invalid - silently handle by clearing token and showing connect button
+            console.log('Strava token expired or invalid - reconnecting required');
+            disconnectStrava(true); // Silent disconnect
+            alert('Strava token is invalid or expired. Please reconnect with a valid token.');
+            return;
+        }
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Strava API error:', response.status, errorText);
+            throw new Error(`Strava API error: ${response.status} - ${errorText}`);
+        }
+        
+        const activities = await response.json();
+        console.log(`Fetched ${activities.length} Strava activities`);
+        
+        // Group activities by date
+        stravaActivities = {};
+        activities.forEach(activity => {
+            const activityDate = new Date(activity.start_date_local);
+            const dateKey = formatDateKey(activityDate);
+            
+            if (!stravaActivities[dateKey]) {
+                stravaActivities[dateKey] = [];
+            }
+            stravaActivities[dateKey].push(activity);
+        });
+        
+        console.log('Activities grouped by date:', Object.keys(stravaActivities).length, 'days with activities');
+        
+        // Update calendar to show workout icons
+        renderCalendar();
+        
+    } catch (error) {
+        console.error('Error fetching Strava activities:', error);
+        // Show alert for errors so user knows what went wrong
+        alert(`Error fetching Strava activities: ${error.message}. Please check your token and try again.`);
+    }
+}
+
+// Token refresh is not implemented client-side as it requires a client secret
+// which should be kept on a backend server for security
+// Users need to reconnect when their token expires (tokens expire after 6 hours)
+
+function loadStravaWorkout(year, month, day, dayElement) {
+    const date = new Date(year, month, day);
+    const dateKey = formatDateKey(date);
+    const workoutIndicator = dayElement.querySelector('.workout-indicator');
+    
+    if (stravaActivities[dateKey] && stravaActivities[dateKey].length > 0) {
+        const activities = stravaActivities[dateKey];
+        workoutIndicator.style.display = 'block';
+        
+        // Get activity type icon
+        const activityType = activities[0].type || 'Run';
+        let icon = '🏃'; // default
+        
+        // Map activity types to icons
+        const typeIcons = {
+            'Run': '🏃',
+            'Ride': '🚴',
+            'Walk': '🚶',
+            'Swim': '🏊',
+            'Hike': '🥾',
+            'Workout': '💪',
+            'Yoga': '🧘',
+            'Crossfit': '🏋️',
+            'WeightTraining': '🏋️',
+            'VirtualRide': '🚴',
+            'VirtualRun': '🏃'
+        };
+        
+        icon = typeIcons[activityType] || '🏃';
+        
+        // If multiple activities, show count
+        if (activities.length > 1) {
+            workoutIndicator.textContent = `${icon} ${activities.length}`;
+            workoutIndicator.title = `${activities.length} activities: ${activities.map(a => a.type || 'Run').join(', ')}`;
+        } else {
+            workoutIndicator.textContent = icon;
+            workoutIndicator.title = `${activityType} - ${activities[0].name || 'Activity'}`;
+        }
+    } else {
+        workoutIndicator.style.display = 'none';
+    }
 }
 
