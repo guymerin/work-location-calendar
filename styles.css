@@ -271,7 +271,7 @@ h1 {
 
 .calendar-header {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(8, 1fr);
     gap: 8px;
     margin-bottom: 10px;
 }
@@ -285,17 +285,24 @@ h1 {
     border-radius: 8px;
 }
 
+.stats-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
 .calendar-grid {
     display: grid;
-    grid-template-columns: repeat(7, 1fr);
+    grid-template-columns: repeat(8, 1fr);
     gap: 8px;
+    /* Ensure all direct children are grid items */
+    grid-auto-flow: row;
 }
 
 .calendar-day {
     aspect-ratio: 1;
     border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 8px;
+    border-radius: 6px;
+    padding: 4px;
     cursor: pointer;
     transition: all 0.3s;
     display: flex;
@@ -304,6 +311,8 @@ h1 {
     justify-content: center;
     background: white;
     position: relative;
+    min-width: 0;
+    min-height: 0;
 }
 
 .calendar-day:hover {
@@ -348,14 +357,14 @@ h1 {
 }
 
 .day-number {
-    font-size: 1.1rem;
+    font-size: 0.9rem;
     font-weight: 500;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .location-indicator {
-    font-size: 1.5rem;
-    margin-top: 4px;
+    font-size: 1.2rem;
+    margin-top: 2px;
 }
 
 .location-indicator.home {
@@ -368,13 +377,13 @@ h1 {
 
 .workout-indicator {
     position: absolute;
-    top: 4px;
-    right: 4px;
-    font-size: 1rem;
+    top: 2px;
+    right: 2px;
+    font-size: 0.85rem;
     background: rgba(255, 255, 255, 0.9);
     border-radius: 50%;
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -386,6 +395,43 @@ h1 {
 .workout-indicator:hover {
     transform: scale(1.1);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.week-stats-cell {
+    aspect-ratio: 1;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 4px;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.55rem;
+    line-height: 1.2;
+    text-align: center;
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+}
+
+.week-stats-cell .stat-item {
+    margin: 1px 0;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.week-stats-cell .stat-label {
+    font-weight: 600;
+    color: #666;
+    font-size: 0.55rem;
+}
+
+.week-stats-cell .stat-value {
+    font-weight: 700;
+    color: #667eea;
+    font-size: 0.65rem;
 }
 
 .legend {

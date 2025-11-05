@@ -259,6 +259,18 @@ function renderCalendar() {
     const prevMonthLastDay = new Date(year, month, 0); // Last day of previous month
     const daysInPrevMonth = prevMonthLastDay.getDate();
 
+    // Helper function to create placeholder stats cell
+    function createPlaceholderStatsCell() {
+        const statsCell = document.createElement('div');
+        statsCell.className = 'week-stats-cell';
+        statsCell.innerHTML = '<div class="stat-item"><span class="stat-label">Loading...</span></div>';
+        statsCell.dataset.statsPlaceholder = 'true';
+        return statsCell;
+    }
+    
+    // Track total day elements added (not including stats cells)
+    let dayElementsAdded = 0;
+    
     // Add previous month's days to complete the first week
     const today = new Date();
     for (let i = 0; i < startingDayOfWeek; i++) {
@@ -279,6 +291,12 @@ function renderCalendar() {
         loadStravaWorkout(prevYear, prevMonth, prevDay, prevDayElement);
         
         calendarGrid.appendChild(prevDayElement);
+        dayElementsAdded++;
+        
+        // Insert stats cell after Sunday (every 7 day elements)
+        if (dayElementsAdded % 7 === 0) {
+            calendarGrid.appendChild(createPlaceholderStatsCell());
+        }
     }
 
     // Add days of the current month
@@ -298,6 +316,12 @@ function renderCalendar() {
         loadStravaWorkout(year, month, day, dayElement);
 
         calendarGrid.appendChild(dayElement);
+        dayElementsAdded++;
+        
+        // Insert stats cell after Sunday (every 7 day elements)
+        if (dayElementsAdded % 7 === 0) {
+            calendarGrid.appendChild(createPlaceholderStatsCell());
+        }
     }
 
     // Add next month's days for remaining cells in the last week
@@ -320,13 +344,19 @@ function renderCalendar() {
             loadDayLocation(nextYear, nextMonth, i, nextDayElement);
             
             calendarGrid.appendChild(nextDayElement);
+            dayElementsAdded++;
+            
+            // Insert stats cell after Sunday (every 7 day elements)
+            if (dayElementsAdded % 7 === 0) {
+                calendarGrid.appendChild(createPlaceholderStatsCell());
+            }
         }
     }
     
-    // Ensure we always show complete weeks (at least 6 weeks = 42 cells)
-    // If we have less than 42 cells, add more days from next month
-    const currentCellCount = calendarGrid.children.length;
-    if (currentCellCount < 42) {
+    // Ensure we always show complete weeks (at least 6 weeks = 42 day cells)
+    // If we have less than 42 day cells, add more days from next month
+    const dayElementsCount = calendarGrid.querySelectorAll('.calendar-day').length;
+    if (dayElementsCount < 42) {
         const nextMonth = month === 11 ? 0 : month + 1;
         const nextYear = month === 11 ? year + 1 : year;
         const nextMonthFirstDay = new Date(nextYear, nextMonth, 1);
@@ -335,7 +365,7 @@ function renderCalendar() {
         // Calculate how many days we've already added from next month
         const alreadyAddedNextMonthDays = remainingCells > 0 && remainingCells < 7 ? remainingCells : 0;
         const startDay = alreadyAddedNextMonthDays + 1;
-        const cellsToAdd = 42 - currentCellCount;
+        const cellsToAdd = 42 - dayElementsCount;
         
         for (let i = 0; i < cellsToAdd && (startDay + i) <= daysInNextMonth; i++) {
             const dayNum = startDay + i;
@@ -355,11 +385,20 @@ function renderCalendar() {
             loadStravaWorkout(nextYear, nextMonth, dayNum, nextDayElement);
             
             calendarGrid.appendChild(nextDayElement);
+            dayElementsAdded++;
+            
+            // Insert stats cell after Sunday (every 7 day elements)
+            if (dayElementsAdded % 7 === 0) {
+                calendarGrid.appendChild(createPlaceholderStatsCell());
+            }
         }
     }
     
     // Add week summary badges after rendering is complete
     addWeekSummaries(year, month, startingDayOfWeek, daysInMonth);
+    
+    // Add week stats cells after rendering is complete
+    addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth);
     
     // Update stats
     updateStats();
@@ -373,7 +412,6 @@ function createDayElement(day, year, month) {
         dayDiv.innerHTML = `
             <div class="day-number">${day}</div>
             <div class="location-indicator" data-location="none"></div>
-            <div class="workout-indicator" style="display: none;"></div>
         `;
         
         dayDiv.addEventListener('click', () => {
@@ -617,28 +655,165 @@ function countAndDisplayWeekSummary(weekDays, startIndex) {
         }
     });
     
-    // Only show badge if there's at least one weekday (Mon-Fri) with explicit data
-    if (hasExplicitWeekdayData) {
-        // Find the Sunday cell (last cell in the week array, which should be at Sunday column)
-        // The week array contains up to 7 elements, and the last one should be Sunday
-        const sundayCell = weekDays[weekDays.length - 1]?.element;
+    // Office badge removed from Sunday cells - office count is now shown in Stats column only
+    // Removed code that displayed badge on Sunday cells
+}
+
+// Helper function to check if an activity is running
+function isRunningActivity(activity) {
+    const activityType = activity.type || 'Run';
+    return activityType === 'Run' || activityType === 'VirtualRun';
+}
+
+// Helper function to check if an activity is weight training
+function isWeightTrainingActivity(activity) {
+    const activityType = activity.type || 'Run';
+    const activityName = (activity.name || '').toLowerCase();
+    return activityType === 'WeightTraining' || 
+           activityType === 'Crossfit' ||
+           activityName.includes('weight') ||
+           activityName.includes('f45') ||
+           activityName.includes('crossfit') ||
+           activityName.includes('gym');
+}
+
+// Helper function to check if an activity is yoga
+function isYogaActivity(activity) {
+    const activityType = activity.type || 'Run';
+    const activityName = (activity.name || '').toLowerCase();
+    return activityType === 'Yoga' ||
+           activityName.includes('yoga') ||
+           activityName.includes('stretching') ||
+           activityName.includes('meditation');
+}
+
+function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
+    if (!currentUser || !db) return;
+    
+    const calendarGrid = document.getElementById('calendarGrid');
+    const allChildren = Array.from(calendarGrid.children);
+    const statsPlaceholders = Array.from(calendarGrid.querySelectorAll('[data-stats-placeholder="true"]'));
+    
+    // Calculate previous and next month info
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    
+    // Get location data
+    db.collection('users').doc(currentUser).get().then(doc => {
+        const locationData = doc.exists ? doc.data() : {};
         
-        if (sundayCell) {
-            // Remove any existing badge first (in case of re-render)
-            const existingBadge = sundayCell.querySelector('.week-summary-badge');
-            if (existingBadge) {
-                existingBadge.remove();
-            }
+        // Find all stats placeholders and calculate stats for their corresponding weeks
+        statsPlaceholders.forEach((statsPlaceholder) => {
+            // Find the index of this stats placeholder in the children array
+            const placeholderIndex = allChildren.indexOf(statsPlaceholder);
             
-            // Create badge
-            const badge = document.createElement('div');
-            badge.className = 'week-summary-badge';
-            badge.textContent = `${officeDays} office`;
+            // The week's 7 days are the 7 elements before this stats placeholder
+            // So we get elements from (placeholderIndex - 7) to (placeholderIndex - 1)
+            const weekStartIndex = placeholderIndex - 7;
+            const weekChildren = allChildren.slice(weekStartIndex, placeholderIndex);
             
-            // Append to the Sunday cell
-            sundayCell.appendChild(badge);
-        }
-    }
+            // Filter to only get day elements (not other stats cells)
+            const weekDays = weekChildren.filter(child => child.classList.contains('calendar-day'));
+            
+            let officeDays = 0;
+            const daysWithRunning = new Set();
+            const daysWithWeightTraining = new Set();
+            const daysWithYoga = new Set();
+            
+            // Process each day in the week
+            weekDays.forEach((dayElement, dayIndex) => {
+                const dayNumber = dayElement.querySelector('.day-number');
+                if (!dayNumber) return;
+                
+                const day = parseInt(dayNumber.textContent);
+                if (isNaN(day)) return;
+                
+                // Determine if this is from previous month, current month, or next month
+                const isOtherMonth = dayElement.classList.contains('other-month');
+                let date;
+                
+                // Calculate global index in the grid (only counting day elements)
+                // We need to count how many day elements come before this one in the full grid
+                let globalDayIndex = 0;
+                for (let i = 0; i < weekStartIndex; i++) {
+                    if (allChildren[i].classList.contains('calendar-day')) {
+                        globalDayIndex++;
+                    }
+                }
+                globalDayIndex += dayIndex;
+                
+                if (isOtherMonth) {
+                    // First startingDayOfWeek cells with other-month are from previous month
+                    // The rest are from next month
+                    if (globalDayIndex < startingDayOfWeek) {
+                        date = new Date(prevYear, prevMonth, day);
+                    } else {
+                        date = new Date(nextYear, nextMonth, day);
+                    }
+                } else {
+                    date = new Date(year, month, day);
+                }
+                
+                const dateKey = formatDateKey(date);
+                
+                // Check office location
+                const explicitLocation = locationData[dateKey];
+                const dayOfWeek = date.getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const location = explicitLocation || (isWeekend ? 'home' : 'none');
+                
+                if (location === 'office') {
+                    officeDays++;
+                }
+                
+                // Check Strava activities
+                if (stravaActivities[dateKey] && stravaActivities[dateKey].length > 0) {
+                    const activities = stravaActivities[dateKey];
+                    
+                    activities.forEach(activity => {
+                        if (isRunningActivity(activity)) {
+                            daysWithRunning.add(dateKey);
+                        }
+                        if (isWeightTrainingActivity(activity)) {
+                            daysWithWeightTraining.add(dateKey);
+                        }
+                        if (isYogaActivity(activity)) {
+                            daysWithYoga.add(dateKey);
+                        }
+                    });
+                }
+            });
+            
+            const runningDays = daysWithRunning.size;
+            const weightTrainingDays = daysWithWeightTraining.size;
+            const yogaDays = daysWithYoga.size;
+            
+            // Update the placeholder with actual stats
+            statsPlaceholder.innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-label">Office:</span>
+                    <span class="stat-value">${officeDays}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🏃:</span>
+                    <span class="stat-value">${runningDays}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🏋️:</span>
+                    <span class="stat-value">${weightTrainingDays}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">🧘:</span>
+                    <span class="stat-value">${yogaDays}</span>
+                </div>
+            `;
+            statsPlaceholder.removeAttribute('data-stats-placeholder');
+        });
+    }).catch(error => {
+        console.error('Error calculating week stats:', error);
+    });
 }
 
 // Helper function to get Monday of the week for a given date
@@ -1015,23 +1190,42 @@ async function fetchStravaActivities(accessToken, refreshToken) {
         // Group activities by date
         stravaActivities = {};
         activities.forEach(activity => {
-            // Parse start_date_local and ensure we use local date components
+            // Parse start_date_local directly from the string to avoid timezone issues
             // start_date_local from Strava is in format "YYYY-MM-DDTHH:mm:ss" in local timezone
-            const activityDate = new Date(activity.start_date_local);
+            // Extract date components directly from the string to avoid timezone conversion issues
+            const dateString = activity.start_date_local;
             
-            // Use local date components to avoid timezone issues
-            // Get year, month, day in local timezone
-            const year = activityDate.getFullYear();
-            const month = activityDate.getMonth();
-            const day = activityDate.getDate();
+            // Parse the date string: "2025-11-05T06:00:00" or "2025-11-05T06:00:00Z" or similar
+            // Extract YYYY-MM-DD part directly
+            const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
             
-            // Create a date key using local date components
-            const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            
-            if (!stravaActivities[dateKey]) {
-                stravaActivities[dateKey] = [];
+            if (dateMatch) {
+                // Extract year, month, day directly from the string (no timezone conversion)
+                const year = dateMatch[1];
+                const month = dateMatch[2];
+                const day = dateMatch[3];
+                
+                // Create a date key using the extracted components
+                const dateKey = `${year}-${month}-${day}`;
+                
+                if (!stravaActivities[dateKey]) {
+                    stravaActivities[dateKey] = [];
+                }
+                stravaActivities[dateKey].push(activity);
+            } else {
+                // Fallback to old method if string format is unexpected
+                console.warn('Unexpected date format:', dateString);
+                const activityDate = new Date(activity.start_date_local);
+                const year = activityDate.getFullYear();
+                const month = activityDate.getMonth();
+                const day = activityDate.getDate();
+                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                if (!stravaActivities[dateKey]) {
+                    stravaActivities[dateKey] = [];
+                }
+                stravaActivities[dateKey].push(activity);
             }
-            stravaActivities[dateKey].push(activity);
         });
         
         // Debug: Log activities for Nov 3rd, 4th, and 5th, 2025
@@ -1065,59 +1259,113 @@ async function fetchStravaActivities(accessToken, refreshToken) {
 // which should be kept on a backend server for security
 // Users need to reconnect when their token expires (tokens expire after 6 hours)
 
+// Helper function to get icon for a specific activity
+function getActivityIcon(activity) {
+    const activityType = activity.type || 'Run';
+    const activityName = (activity.name || '').toLowerCase();
+    
+    // Check if activity name contains yoga keywords (even if type is "Workout")
+    const isYoga = activityName.includes('yoga') || 
+                   activityName.includes('stretching') || 
+                   activityName.includes('meditation') ||
+                   activityType === 'Yoga';
+    
+    // Check if activity name contains snowshoe keywords (even if type is "Hike" or "Walk")
+    const isSnowshoe = activityName.includes('snowshoe') || 
+                      activityName.includes('snow shoe') ||
+                      activityType === 'Snowshoe';
+    
+    // Check if activity is a water sport (standup paddling, kayaking, etc.)
+    const isWaterSport = activityName.includes('paddling') || 
+                        activityName.includes('paddle') ||
+                        activityName.includes('sup') ||
+                        activityName.includes('stand up') ||
+                        activityName.includes('kayak') ||
+                        activityName.includes('canoe') ||
+                        activityType === 'WaterSport' ||
+                        activityType === 'Kayaking' ||
+                        activityType === 'Canoeing' ||
+                        activityType === 'StandUpPaddling';
+    
+    // Map activity types to icons
+    const typeIcons = {
+        'Run': '🏃',
+        'Ride': '🚴',
+        'Walk': isSnowshoe ? '🎿' : '🚶', // Use skis icon for snowshoeing
+        'Swim': '🏊',
+        'Hike': isSnowshoe ? '🎿' : '🥾', // Use skis icon for snowshoeing
+        'Workout': isYoga ? '🧘' : '💪', // Use yoga icon if it's yoga-related
+        'Yoga': '🧘',
+        'Snowshoe': '🎿',
+        'WaterSport': '🚣', // Standup paddle icon (rowing/paddling)
+        'Kayaking': '🚣',
+        'Canoeing': '🚣',
+        'StandUpPaddling': '🚣',
+        'Crossfit': '🏋️',
+        'WeightTraining': '🏋️',
+        'VirtualRide': '🚴',
+        'VirtualRun': '🏃'
+    };
+    
+    // If it's a water sport, use paddling/rowing icon
+    if (isWaterSport) {
+        return '🚣';
+    }
+    
+    return typeIcons[activityType] || (isYoga ? '🧘' : (isSnowshoe ? '🎿' : '🏃'));
+}
+
 function loadStravaWorkout(year, month, day, dayElement) {
     const date = new Date(year, month, day);
     const dateKey = formatDateKey(date);
-    const workoutIndicator = dayElement.querySelector('.workout-indicator');
+    
+    // Remove any existing workout indicators
+    const existingIndicators = dayElement.querySelectorAll('.workout-indicator');
+    existingIndicators.forEach(indicator => indicator.remove());
     
     if (stravaActivities[dateKey] && stravaActivities[dateKey].length > 0) {
         const activities = stravaActivities[dateKey];
-        workoutIndicator.style.display = 'block';
         
-        // Get activity type icon
-        const activityType = activities[0].type || 'Run';
-        const activityName = (activities[0].name || '').toLowerCase();
-        let icon = '🏃'; // default
-        
-        // Check if activity name contains yoga keywords (even if type is "Workout")
-        const isYoga = activityName.includes('yoga') || 
-                       activityName.includes('stretching') || 
-                       activityName.includes('meditation') ||
-                       activityType === 'Yoga';
-        
-        // Check if activity name contains snowshoe keywords (even if type is "Hike" or "Walk")
-        const isSnowshoe = activityName.includes('snowshoe') || 
-                          activityName.includes('snow shoe') ||
-                          activityType === 'Snowshoe';
-        
-        // Map activity types to icons
-        const typeIcons = {
-            'Run': '🏃',
-            'Ride': '🚴',
-            'Walk': isSnowshoe ? '🎿' : '🚶', // Use skis icon for snowshoeing
-            'Swim': '🏊',
-            'Hike': isSnowshoe ? '🎿' : '🥾', // Use skis icon for snowshoeing
-            'Workout': isYoga ? '🧘' : '💪', // Use yoga icon if it's yoga-related
-            'Yoga': '🧘',
-            'Snowshoe': '🎿',
-            'Crossfit': '🏋️',
-            'WeightTraining': '🏋️',
-            'VirtualRide': '🚴',
-            'VirtualRun': '🏃'
-        };
-        
-        icon = typeIcons[activityType] || (isYoga ? '🧘' : (isSnowshoe ? '🎿' : '🏃'));
-        
-        // If multiple activities, show count
-        if (activities.length > 1) {
-            workoutIndicator.textContent = `${icon} ${activities.length}`;
-            workoutIndicator.title = `${activities.length} activities: ${activities.map(a => a.type || 'Run').join(', ')}`;
-        } else {
+        // Create one indicator per activity
+        activities.forEach((activity, index) => {
+            const workoutIndicator = document.createElement('div');
+            workoutIndicator.className = 'workout-indicator';
+            
+            // Position indicators: first one top-right, second top-left, third bottom-right, etc.
+            const positions = [
+                { top: '2px', right: '2px', left: 'auto' }, // top-right
+                { top: '2px', left: '2px', right: 'auto' },  // top-left
+                { top: 'auto', right: '2px', bottom: '2px', left: 'auto' }, // bottom-right
+                { top: 'auto', left: '2px', bottom: '2px', right: 'auto' }   // bottom-left
+            ];
+            const position = positions[Math.min(index, positions.length - 1)];
+            
+            Object.assign(workoutIndicator.style, {
+                position: 'absolute',
+                top: position.top || 'auto',
+                right: position.right || 'auto',
+                left: position.left || 'auto',
+                bottom: position.bottom || 'auto',
+                fontSize: '0.85rem',
+                background: 'rgba(255, 255, 255, 0.9)',
+                borderRadius: '50%',
+                width: '18px',
+                height: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                zIndex: '5',
+                cursor: 'help'
+            });
+            
+            const icon = getActivityIcon(activity);
+            const activityType = activity.type || 'Run';
             workoutIndicator.textContent = icon;
-            workoutIndicator.title = `${activityType} - ${activities[0].name || 'Activity'}`;
-        }
-    } else {
-        workoutIndicator.style.display = 'none';
+            workoutIndicator.title = `${activityType} - ${activity.name || 'Activity'}`;
+            
+            dayElement.appendChild(workoutIndicator);
+        });
     }
 }
 
