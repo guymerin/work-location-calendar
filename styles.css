@@ -462,13 +462,12 @@ h1 {
     aspect-ratio: 1;
     border: 2px solid #e0e0e0;
     border-radius: 6px;
-    padding: 2px 1px;
+    padding: 4px 2px;
     background: #f8f9fa;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1px 3px;
-    align-content: center;
-    justify-items: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
     font-size: 0.65rem;
     line-height: 1;
     text-align: center;
@@ -478,32 +477,43 @@ h1 {
     overflow: hidden;
 }
 
+.week-stats-cell .stat-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex-wrap: nowrap;
+}
+
 .week-stats-cell .stat-item {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    gap: 1px;
+    justify-content: center;
+    gap: 3px;
 }
 
 .week-stats-cell .stat-label {
     font-weight: 600;
     color: #666;
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     filter: brightness(1.2) contrast(1.1);
     background: rgba(0, 0, 0, 0.08);
     border-radius: 50%;
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    flex-shrink: 0;
 }
 
 .week-stats-cell .stat-value {
     font-weight: 700;
     color: #667eea;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     line-height: 1;
 }
 

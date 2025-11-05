@@ -852,34 +852,38 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                 // Build stats HTML based on active filters
                 let statsHTML = '';
                 
-                // Work stats (office and home)
+                // Work stats (office and home) - upper half, one line
                 if (activeFilters.work) {
                     statsHTML += `
-                        <div class="stat-item">
-                            <span class="stat-label">🏢:</span>
-                            <span class="stat-value">${officeDays}${officeGoalMet ? ' <span class="goal-met">✓</span>' : ''}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">🏠:</span>
-                            <span class="stat-value">${homeDays}</span>
+                        <div class="stat-row">
+                            <div class="stat-item">
+                                <span class="stat-label">🏢</span>
+                                <span class="stat-value">${officeDays}${officeGoalMet ? '<span class="goal-met">✓</span>' : ''}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">🏠</span>
+                                <span class="stat-value">${homeDays}</span>
+                            </div>
                         </div>
                     `;
                 }
                 
-                // Health stats (running, weights, yoga)
+                // Health stats (running, weights, yoga) - lower half, one line
                 if (activeFilters.health) {
                     statsHTML += `
-                        <div class="stat-item">
-                            <span class="stat-label">🏃:</span>
-                            <span class="stat-value">${runningDays}${runningGoalMet ? ' <span class="goal-met">✓</span>' : ''}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">🏋️:</span>
-                            <span class="stat-value">${weightTrainingDays}${weightsGoalMet ? ' <span class="goal-met">✓</span>' : ''}</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">🧘:</span>
-                            <span class="stat-value">${yogaDays}${yogaGoalMet ? ' <span class="goal-met">✓</span>' : ''}</span>
+                        <div class="stat-row">
+                            <div class="stat-item">
+                                <span class="stat-label">🏃</span>
+                                <span class="stat-value">${runningDays}${runningGoalMet ? '<span class="goal-met">✓</span>' : ''}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">🏋️</span>
+                                <span class="stat-value">${weightTrainingDays}${weightsGoalMet ? '<span class="goal-met">✓</span>' : ''}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">🧘</span>
+                                <span class="stat-value">${yogaDays}${yogaGoalMet ? '<span class="goal-met">✓</span>' : ''}</span>
+                            </div>
                         </div>
                     `;
                 }
