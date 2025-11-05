@@ -115,19 +115,24 @@ function handleStravaOAuthCallback() {
                     </button>
                 `;
                 
-                // Re-initialize the save button listener
-                const saveBtn = document.getElementById('saveStravaToken');
-                if (saveBtn) {
-                    saveBtn.replaceWith(saveBtn.cloneNode(true));
-                    document.getElementById('saveStravaToken').addEventListener('click', () => {
-                        const token = document.getElementById('stravaTokenInput').value.trim();
-                        if (token) {
-                            saveStravaToken(token, null);
-                        } else {
-                            alert('Please enter an access token');
-                        }
-                    });
-                }
+                // Re-initialize the save button listener after innerHTML replacement
+                setTimeout(() => {
+                    const saveBtn = document.getElementById('saveStravaToken');
+                    if (saveBtn) {
+                        // Remove any existing listeners by cloning
+                        const newSaveBtn = saveBtn.cloneNode(true);
+                        saveBtn.replaceWith(newSaveBtn);
+                        // Add event listener to the new button
+                        newSaveBtn.addEventListener('click', () => {
+                            const token = document.getElementById('stravaTokenInput').value.trim();
+                            if (token) {
+                                saveStravaToken(token, null);
+                            } else {
+                                alert('Please enter an access token');
+                            }
+                        });
+                    }
+                }, 0);
             }
         }
         
@@ -1010,13 +1015,38 @@ async function fetchStravaActivities(accessToken, refreshToken) {
         // Group activities by date
         stravaActivities = {};
         activities.forEach(activity => {
+            // Parse start_date_local and ensure we use local date components
+            // start_date_local from Strava is in format "YYYY-MM-DDTHH:mm:ss" in local timezone
             const activityDate = new Date(activity.start_date_local);
-            const dateKey = formatDateKey(activityDate);
+            
+            // Use local date components to avoid timezone issues
+            // Get year, month, day in local timezone
+            const year = activityDate.getFullYear();
+            const month = activityDate.getMonth();
+            const day = activityDate.getDate();
+            
+            // Create a date key using local date components
+            const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             
             if (!stravaActivities[dateKey]) {
                 stravaActivities[dateKey] = [];
             }
             stravaActivities[dateKey].push(activity);
+        });
+        
+        // Debug: Log activities for Nov 3rd, 4th, and 5th, 2025
+        const debugDates = ['2025-11-03', '2025-11-04', '2025-11-05'];
+        debugDates.forEach(dateKey => {
+            if (stravaActivities[dateKey]) {
+                console.log(`${dateKey} activities (${stravaActivities[dateKey].length}):`, 
+                    stravaActivities[dateKey].map(a => ({
+                        type: a.type,
+                        name: a.name,
+                        start_date_local: a.start_date_local,
+                        id: a.id,
+                        parsed_date: formatDateKey(new Date(a.start_date_local))
+                    })));
+            }
         });
         
         console.log('Activities grouped by date:', Object.keys(stravaActivities).length, 'days with activities');
@@ -1046,24 +1076,37 @@ function loadStravaWorkout(year, month, day, dayElement) {
         
         // Get activity type icon
         const activityType = activities[0].type || 'Run';
+        const activityName = (activities[0].name || '').toLowerCase();
         let icon = '🏃'; // default
+        
+        // Check if activity name contains yoga keywords (even if type is "Workout")
+        const isYoga = activityName.includes('yoga') || 
+                       activityName.includes('stretching') || 
+                       activityName.includes('meditation') ||
+                       activityType === 'Yoga';
+        
+        // Check if activity name contains snowshoe keywords (even if type is "Hike" or "Walk")
+        const isSnowshoe = activityName.includes('snowshoe') || 
+                          activityName.includes('snow shoe') ||
+                          activityType === 'Snowshoe';
         
         // Map activity types to icons
         const typeIcons = {
             'Run': '🏃',
             'Ride': '🚴',
-            'Walk': '🚶',
+            'Walk': isSnowshoe ? '🎿' : '🚶', // Use skis icon for snowshoeing
             'Swim': '🏊',
-            'Hike': '🥾',
-            'Workout': '💪',
+            'Hike': isSnowshoe ? '🎿' : '🥾', // Use skis icon for snowshoeing
+            'Workout': isYoga ? '🧘' : '💪', // Use yoga icon if it's yoga-related
             'Yoga': '🧘',
+            'Snowshoe': '🎿',
             'Crossfit': '🏋️',
             'WeightTraining': '🏋️',
             'VirtualRide': '🚴',
             'VirtualRun': '🏃'
         };
         
-        icon = typeIcons[activityType] || '🏃';
+        icon = typeIcons[activityType] || (isYoga ? '🧘' : (isSnowshoe ? '🎿' : '🏃'));
         
         // If multiple activities, show count
         if (activities.length > 1) {
