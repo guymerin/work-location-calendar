@@ -46,6 +46,10 @@ let currentDate = new Date();
 let currentUser = localStorage.getItem('currentUser') || '';
 let selectedDate = null;
 let stravaActivities = {}; // Cache of activities by date (YYYY-MM-DD)
+let activeFilters = {
+    work: true,
+    health: true
+}; // Track which filters are active
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -152,6 +156,10 @@ function initializeApp() {
     document.getElementById('setUserName').addEventListener('click', setUserName);
     document.getElementById('prevMonth').addEventListener('click', () => changeMonth(-1));
     document.getElementById('nextMonth').addEventListener('click', () => changeMonth(1));
+    
+    // Filter button listeners
+    document.getElementById('workFilter').addEventListener('click', () => toggleFilter('work'));
+    document.getElementById('healthFilter').addEventListener('click', () => toggleFilter('health'));
 
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
@@ -169,6 +177,9 @@ function initializeApp() {
     
     // Initialize Strava buttons
     initializeStravaButtons();
+    
+    // Initialize Settings modal
+    initializeSettingsModal();
     
     // Load Strava connection status
     if (currentUser) {
@@ -234,6 +245,21 @@ function changeMonth(direction) {
     renderCalendar();
 }
 
+function toggleFilter(filterType) {
+    activeFilters[filterType] = !activeFilters[filterType];
+    
+    // Update button appearance
+    const button = document.getElementById(filterType + 'Filter');
+    if (activeFilters[filterType]) {
+        button.classList.add('active');
+    } else {
+        button.classList.remove('active');
+    }
+    
+    // Re-render calendar to update stats
+    renderCalendar();
+}
+
 function renderCalendar() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -242,6 +268,12 @@ function renderCalendar() {
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'];
     document.getElementById('currentMonthYear').textContent = `${monthNames[month]} ${year}`;
+    
+    // Update navigation button text with month names
+    const prevMonthIndex = month === 0 ? 11 : month - 1;
+    const nextMonthIndex = month === 11 ? 0 : month + 1;
+    document.getElementById('prevMonth').textContent = `← ${monthNames[prevMonthIndex]}`;
+    document.getElementById('nextMonth').textContent = `${monthNames[nextMonthIndex]} →`;
 
     // Get first day of month and number of days
     const firstDay = new Date(year, month, 1);
@@ -700,9 +732,15 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
     const nextMonth = month === 11 ? 0 : month + 1;
     const nextYear = month === 11 ? year + 1 : year;
     
-    // Get location data
+    // Get location data and goals
     db.collection('users').doc(currentUser).get().then(doc => {
         const locationData = doc.exists ? doc.data() : {};
+        const userGoals = (doc.exists && doc.data().weeklyGoals) ? doc.data().weeklyGoals : {
+            office: 3,
+            running: 0,
+            weights: 0,
+            yoga: 0
+        };
         
         // Find all stats placeholders and calculate stats for their corresponding weeks
         statsPlaceholders.forEach((statsPlaceholder) => {
@@ -718,9 +756,15 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
             const weekDays = weekChildren.filter(child => child.classList.contains('calendar-day'));
             
             let officeDays = 0;
+            let homeDays = 0;
             const daysWithRunning = new Set();
             const daysWithWeightTraining = new Set();
             const daysWithYoga = new Set();
+            let weekHasStarted = false;
+            
+            // Get today's date at midnight for comparison
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
             
             // Process each day in the week
             weekDays.forEach((dayElement, dayIndex) => {
@@ -756,6 +800,11 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                     date = new Date(year, month, day);
                 }
                 
+                // Check if this day has occurred (is today or in the past)
+                if (date <= today) {
+                    weekHasStarted = true;
+                }
+                
                 const dateKey = formatDateKey(date);
                 
                 // Check office location
@@ -766,6 +815,8 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                 
                 if (location === 'office') {
                     officeDays++;
+                } else if (location === 'home') {
+                    homeDays++;
                 }
                 
                 // Check Strava activities
@@ -786,29 +837,59 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                 }
             });
             
-            const runningDays = daysWithRunning.size;
-            const weightTrainingDays = daysWithWeightTraining.size;
-            const yogaDays = daysWithYoga.size;
-            
-            // Update the placeholder with actual stats
-            statsPlaceholder.innerHTML = `
-                <div class="stat-item">
-                    <span class="stat-label">Office:</span>
-                    <span class="stat-value">${officeDays}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">🏃:</span>
-                    <span class="stat-value">${runningDays}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">🏋️:</span>
-                    <span class="stat-value">${weightTrainingDays}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">🧘:</span>
-                    <span class="stat-value">${yogaDays}</span>
-                </div>
-            `;
+            // Only show stats if the week has started
+            if (weekHasStarted) {
+                const runningDays = daysWithRunning.size;
+                const weightTrainingDays = daysWithWeightTraining.size;
+                const yogaDays = daysWithYoga.size;
+                
+                // Check if goals are met
+                const officeGoalMet = userGoals.office > 0 && officeDays >= userGoals.office;
+                const runningGoalMet = userGoals.running > 0 && runningDays >= userGoals.running;
+                const weightsGoalMet = userGoals.weights > 0 && weightTrainingDays >= userGoals.weights;
+                const yogaGoalMet = userGoals.yoga > 0 && yogaDays >= userGoals.yoga;
+                
+                // Build stats HTML based on active filters
+                let statsHTML = '';
+                
+                // Work stats (office and home)
+                if (activeFilters.work) {
+                    statsHTML += `
+                        <div class="stat-item">
+                            <span class="stat-label">🏢:</span>
+                            <span class="stat-value">${officeDays}${officeGoalMet ? ' <span class="goal-met">✓</span>' : ''}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">🏠:</span>
+                            <span class="stat-value">${homeDays}</span>
+                        </div>
+                    `;
+                }
+                
+                // Health stats (running, weights, yoga)
+                if (activeFilters.health) {
+                    statsHTML += `
+                        <div class="stat-item">
+                            <span class="stat-label">🏃:</span>
+                            <span class="stat-value">${runningDays}${runningGoalMet ? ' <span class="goal-met">✓</span>' : ''}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">🏋️:</span>
+                            <span class="stat-value">${weightTrainingDays}${weightsGoalMet ? ' <span class="goal-met">✓</span>' : ''}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">🧘:</span>
+                            <span class="stat-value">${yogaDays}${yogaGoalMet ? ' <span class="goal-met">✓</span>' : ''}</span>
+                        </div>
+                    `;
+                }
+                
+                // Update the placeholder with filtered stats
+                statsPlaceholder.innerHTML = statsHTML;
+            } else {
+                // Week hasn't started yet - leave it empty
+                statsPlaceholder.innerHTML = '';
+            }
             statsPlaceholder.removeAttribute('data-stats-placeholder');
         });
     }).catch(error => {
@@ -1018,6 +1099,117 @@ function initializeStravaButtons() {
         if (e.target === stravaModal) {
             stravaModal.style.display = 'none';
         }
+    });
+}
+
+function initializeSettingsModal() {
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsModalClose = document.getElementById('settingsModalClose');
+    const saveGoalsBtn = document.getElementById('saveGoals');
+    
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            if (!currentUser) {
+                alert('Please enter your name first');
+                return;
+            }
+            loadUserGoals();
+            settingsModal.style.display = 'block';
+        });
+    }
+    
+    if (settingsModalClose) {
+        settingsModalClose.addEventListener('click', () => {
+            settingsModal.style.display = 'none';
+        });
+    }
+    
+    if (saveGoalsBtn) {
+        saveGoalsBtn.addEventListener('click', () => {
+            saveUserGoals();
+        });
+    }
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target === settingsModal) {
+            settingsModal.style.display = 'none';
+        }
+    });
+}
+
+function loadUserGoals() {
+    if (!currentUser || !db) return;
+    
+    const userDocRef = db.collection('users').doc(currentUser);
+    userDocRef.get().then(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            const goals = data.weeklyGoals || {};
+            
+            document.getElementById('officeGoal').value = goals.office || 3;
+            document.getElementById('runningGoal').value = goals.running || 0;
+            document.getElementById('weightsGoal').value = goals.weights || 0;
+            document.getElementById('yogaGoal').value = goals.yoga || 0;
+        }
+    }).catch(error => {
+        console.error('Error loading goals:', error);
+    });
+}
+
+function saveUserGoals() {
+    if (!currentUser || !db) return;
+    
+    const officeGoal = parseInt(document.getElementById('officeGoal').value) || 0;
+    const runningGoal = parseInt(document.getElementById('runningGoal').value) || 0;
+    const weightsGoal = parseInt(document.getElementById('weightsGoal').value) || 0;
+    const yogaGoal = parseInt(document.getElementById('yogaGoal').value) || 0;
+    
+    // Validate inputs
+    if (officeGoal < 0 || officeGoal > 5) {
+        alert('Office days must be between 0 and 5');
+        return;
+    }
+    if (runningGoal < 0 || runningGoal > 7) {
+        alert('Running days must be between 0 and 7');
+        return;
+    }
+    if (weightsGoal < 0 || weightsGoal > 7) {
+        alert('Weight training days must be between 0 and 7');
+        return;
+    }
+    if (yogaGoal < 0 || yogaGoal > 7) {
+        alert('Yoga days must be between 0 and 7');
+        return;
+    }
+    
+    const goals = {
+        office: officeGoal,
+        running: runningGoal,
+        weights: weightsGoal,
+        yoga: yogaGoal
+    };
+    
+    const userDocRef = db.collection('users').doc(currentUser);
+    userDocRef.get().then(doc => {
+        const data = doc.exists ? doc.data() : {};
+        data.weeklyGoals = goals;
+        
+        userDocRef.set(data, { merge: true })
+            .then(() => {
+                console.log('Weekly goals saved successfully');
+                document.getElementById('settingsModal').style.display = 'none';
+                alert('Goals saved successfully!');
+                renderCalendar(); // Re-render to show any visual changes
+            })
+            .catch(error => {
+                console.error('Error saving goals:', error);
+                alert('Failed to save goals. Please try again.');
+            });
+    }).catch(error => {
+        console.error('Error saving goals:', error);
+        alert('Failed to save goals. Please try again.');
     });
 }
 

@@ -18,6 +18,7 @@
             <div class="user-section">
                 <input type="text" id="userName" placeholder="Enter your name" maxlength="20">
                 <button id="setUserName">Set Name</button>
+                <button id="settingsBtn" class="settings-btn" title="Settings">⚙️</button>
                 <button id="stravaConnectBtn" class="strava-btn" style="display: none;">
                     <span>🏃</span> Connect Strava
                 </button>
@@ -31,6 +32,17 @@
             <button id="prevMonth" class="nav-btn">← Previous</button>
             <h2 id="currentMonthYear"></h2>
             <button id="nextMonth" class="nav-btn">Next →</button>
+        </div>
+
+        <div class="filter-controls">
+            <button id="workFilter" class="filter-btn active" data-filter="work">
+                <span class="filter-icon">🏢</span>
+                <span>Work Stats</span>
+            </button>
+            <button id="healthFilter" class="filter-btn active" data-filter="health">
+                <span class="filter-icon">💪</span>
+                <span>Health Stats</span>
+            </button>
         </div>
 
         <div id="statsSection" class="stats-section">
@@ -123,6 +135,51 @@
                 <p style="margin-top: 15px; font-size: 0.85rem; color: #666;">
                     <strong>Note:</strong> Strava access tokens expire after 6 hours. If your workouts stop showing, simply reconnect by clicking "Connect Strava" again and pasting a new token. The app will automatically detect when your token expires and show the connect button again.
                 </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal">
+        <div class="modal-content settings-modal-content">
+            <span class="close" id="settingsModalClose">&times;</span>
+            <h3>Weekly Goals</h3>
+            <p class="settings-description">Set your weekly targets for each activity</p>
+            <div class="settings-form">
+                <div class="goal-setting">
+                    <label for="officeGoal">
+                        <span class="goal-icon">🏢</span>
+                        <span class="goal-label">Office Days</span>
+                    </label>
+                    <input type="number" id="officeGoal" min="0" max="5" value="3">
+                    <span class="goal-range">0-5 days</span>
+                </div>
+                <div class="goal-setting">
+                    <label for="runningGoal">
+                        <span class="goal-icon">🏃</span>
+                        <span class="goal-label">Running Days</span>
+                    </label>
+                    <input type="number" id="runningGoal" min="0" max="7" value="0">
+                    <span class="goal-range">0-7 days</span>
+                </div>
+                <div class="goal-setting">
+                    <label for="weightsGoal">
+                        <span class="goal-icon">🏋️</span>
+                        <span class="goal-label">Weight Training Days</span>
+                    </label>
+                    <input type="number" id="weightsGoal" min="0" max="7" value="0">
+                    <span class="goal-range">0-7 days</span>
+                </div>
+                <div class="goal-setting">
+                    <label for="yogaGoal">
+                        <span class="goal-icon">🧘</span>
+                        <span class="goal-label">Yoga Days</span>
+                    </label>
+                    <input type="number" id="yogaGoal" min="0" max="7" value="0">
+                    <span class="goal-range">0-7 days</span>
+                </div>
+                <button id="saveGoals" class="save-goals-btn">
+                    Save Goals
+                </button>
             </div>
         </div>
     </div>
