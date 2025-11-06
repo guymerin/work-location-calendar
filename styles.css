@@ -696,7 +696,30 @@ h1 {
 
 /* Settings Modal Styles */
 .settings-modal-content {
-    max-width: 500px;
+    max-width: 550px;
+}
+
+.settings-section {
+    margin-bottom: 30px;
+    padding-bottom: 25px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.settings-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.settings-section-title {
+    font-size: 1.2rem;
+    color: #667eea;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.strava-connection-status {
+    display: flex;
+    justify-content: center;
 }
 
 .settings-description {

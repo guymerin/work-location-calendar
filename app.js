@@ -1119,6 +1119,7 @@ function initializeSettingsModal() {
                 return;
             }
             loadUserGoals();
+            checkStravaConnection(); // Update Strava button status when opening settings
             settingsModal.style.display = 'block';
         });
     }

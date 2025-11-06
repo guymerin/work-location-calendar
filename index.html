@@ -19,12 +19,6 @@
                 <input type="text" id="userName" placeholder="Enter your name" maxlength="20">
                 <button id="setUserName">Set Name</button>
                 <button id="settingsBtn" class="settings-btn" title="Settings">⚙️</button>
-                <button id="stravaConnectBtn" class="strava-btn" style="display: none;">
-                    <span>🏃</span> Connect Strava
-                </button>
-                <button id="stravaDisconnectBtn" class="strava-btn disconnect" style="display: none;">
-                    <span>🏃</span> Disconnect Strava
-                </button>
             </div>
         </header>
 
@@ -142,44 +136,62 @@
     <div id="settingsModal" class="modal">
         <div class="modal-content settings-modal-content">
             <span class="close" id="settingsModalClose">&times;</span>
-            <h3>Weekly Goals</h3>
-            <p class="settings-description">Set your weekly targets for each activity</p>
-            <div class="settings-form">
-                <div class="goal-setting">
-                    <label for="officeGoal">
-                        <span class="goal-icon">🏢</span>
-                        <span class="goal-label">Office Days</span>
-                    </label>
-                    <input type="number" id="officeGoal" min="0" max="5" value="3">
-                    <span class="goal-range">0-5 days</span>
+            <h3>Settings</h3>
+            
+            <!-- Strava Connection Section -->
+            <div class="settings-section">
+                <h4 class="settings-section-title">🏃 Strava Connection</h4>
+                <div class="strava-connection-status">
+                    <button id="stravaConnectBtn" class="strava-btn" style="display: none;">
+                        <span>🏃</span> Connect Strava
+                    </button>
+                    <button id="stravaDisconnectBtn" class="strava-btn disconnect" style="display: none;">
+                        <span>🏃</span> Disconnect Strava
+                    </button>
                 </div>
-                <div class="goal-setting">
-                    <label for="runningGoal">
-                        <span class="goal-icon">🏃</span>
-                        <span class="goal-label">Running Days</span>
-                    </label>
-                    <input type="number" id="runningGoal" min="0" max="7" value="0">
-                    <span class="goal-range">0-7 days</span>
+            </div>
+
+            <!-- Weekly Goals Section -->
+            <div class="settings-section">
+                <h4 class="settings-section-title">🎯 Weekly Goals</h4>
+                <p class="settings-description">Set your weekly targets for each activity</p>
+                <div class="settings-form">
+                    <div class="goal-setting">
+                        <label for="officeGoal">
+                            <span class="goal-icon">🏢</span>
+                            <span class="goal-label">Office Days</span>
+                        </label>
+                        <input type="number" id="officeGoal" min="0" max="5" value="3">
+                        <span class="goal-range">0-5 days</span>
+                    </div>
+                    <div class="goal-setting">
+                        <label for="runningGoal">
+                            <span class="goal-icon">🏃</span>
+                            <span class="goal-label">Running Days</span>
+                        </label>
+                        <input type="number" id="runningGoal" min="0" max="7" value="0">
+                        <span class="goal-range">0-7 days</span>
+                    </div>
+                    <div class="goal-setting">
+                        <label for="weightsGoal">
+                            <span class="goal-icon">🏋️</span>
+                            <span class="goal-label">Weight Training Days</span>
+                        </label>
+                        <input type="number" id="weightsGoal" min="0" max="7" value="0">
+                        <span class="goal-range">0-7 days</span>
+                    </div>
+                    <div class="goal-setting">
+                        <label for="yogaGoal">
+                            <span class="goal-icon">🧘</span>
+                            <span class="goal-label">Yoga Days</span>
+                        </label>
+                        <input type="number" id="yogaGoal" min="0" max="7" value="0">
+                        <span class="goal-range">0-7 days</span>
+                    </div>
+                    <button id="saveGoals" class="save-goals-btn">
+                        Save Goals
+                    </button>
                 </div>
-                <div class="goal-setting">
-                    <label for="weightsGoal">
-                        <span class="goal-icon">🏋️</span>
-                        <span class="goal-label">Weight Training Days</span>
-                    </label>
-                    <input type="number" id="weightsGoal" min="0" max="7" value="0">
-                    <span class="goal-range">0-7 days</span>
-                </div>
-                <div class="goal-setting">
-                    <label for="yogaGoal">
-                        <span class="goal-icon">🧘</span>
-                        <span class="goal-label">Yoga Days</span>
-                    </label>
-                    <input type="number" id="yogaGoal" min="0" max="7" value="0">
-                    <span class="goal-range">0-7 days</span>
-                </div>
-                <button id="saveGoals" class="save-goals-btn">
-                    Save Goals
-                </button>
             </div>
         </div>
     </div>
