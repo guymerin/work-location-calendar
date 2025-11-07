@@ -55,8 +55,6 @@ let activeFilters = {
 document.addEventListener('DOMContentLoaded', () => {
     // Check if we're returning from Strava OAuth
     handleStravaOAuthCallback();
-    // Check if we're returning from Garmin OAuth
-    handleGarminOAuthCallback();
     initializeApp();
 });
 
@@ -76,7 +74,7 @@ function handleStravaOAuthCallback() {
             statusDiv.style.color = '#c62828';
             statusDiv.innerHTML = `❌ Authorization failed: ${error}`;
         } else {
-            alert(`Strava authorization failed: ${error}`);
+        alert(`Strava authorization failed: ${error}`);
         }
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -100,69 +98,69 @@ function handleStravaOAuthCallback() {
             exchangeStravaCodeForToken(code, storedClientId, storedClientSecret);
         } else {
             // Fallback to old manual method if credentials not stored
-            const modal = document.getElementById('stravaModal');
-            if (modal) {
-                modal.style.display = 'block';
-                const tokenInput = document.getElementById('stravaTokenInput');
-                if (tokenInput) {
-                    tokenInput.placeholder = 'Authorization code received! Follow the steps below to exchange it for a token.';
-                }
+        const modal = document.getElementById('stravaModal');
+        if (modal) {
+            modal.style.display = 'block';
+            const tokenInput = document.getElementById('stravaTokenInput');
+            if (tokenInput) {
+                tokenInput.placeholder = 'Authorization code received! Follow the steps below to exchange it for a token.';
+            }
+            
+            // Show instructions for exchanging code
+            const instructions = document.querySelector('.strava-connect-section');
+            if (instructions) {
+                instructions.innerHTML = `
+                    <p style="color: #4caf50; font-weight: 600;">✅ Authorization code received!</p>
+                    <p>Your authorization code: <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${code}</code></p>
+                    <p>To exchange this code for an access token, you need to make a POST request:</p>
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; font-family: monospace; font-size: 0.9em;">
+                        <strong>POST</strong> https://www.strava.com/oauth/token<br><br>
+                        <strong>Body (form-data or JSON):</strong><br>
+                        client_id: YOUR_CLIENT_ID<br>
+                        client_secret: YOUR_CLIENT_SECRET<br>
+                        code: ${code}<br>
+                        grant_type: authorization_code
+                    </div>
+                    <p>You can use <a href="https://www.postman.com/" target="_blank">Postman</a>, <a href="https://httpie.io/" target="_blank">HTTPie</a>, or curl to make this request.</p>
+                    <p style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 0.9rem;">
+                        <strong>Example with curl:</strong><br>
+                        <code style="font-size: 0.85em; display: block; margin-top: 5px;">
+                            curl -X POST https://www.strava.com/oauth/token \\<br>
+                            &nbsp;&nbsp;-d client_id=YOUR_CLIENT_ID \\<br>
+                            &nbsp;&nbsp;-d client_secret=YOUR_CLIENT_SECRET \\<br>
+                            &nbsp;&nbsp;-d code=${code} \\<br>
+                            &nbsp;&nbsp;-d grant_type=authorization_code
+                        </code>
+                    </p>
+                    <p>Once you get the response, paste the <strong>access_token</strong> below:</p>
+                    <div style="margin: 20px 0;">
+                        <label for="stravaTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Access Token:</label>
+                        <input type="text" id="stravaTokenInput" placeholder="Paste your access token here" 
+                               style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                    </div>
+                    <button id="saveStravaToken" class="location-btn office-btn" style="width: 100%; margin-top: 10px;">
+                        Save Token
+                    </button>
+                `;
                 
-                // Show instructions for exchanging code
-                const instructions = document.querySelector('.strava-connect-section');
-                if (instructions) {
-                    instructions.innerHTML = `
-                        <p style="color: #4caf50; font-weight: 600;">✅ Authorization code received!</p>
-                        <p>Your authorization code: <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${code}</code></p>
-                        <p>To exchange this code for an access token, you need to make a POST request:</p>
-                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; font-family: monospace; font-size: 0.9em;">
-                            <strong>POST</strong> https://www.strava.com/oauth/token<br><br>
-                            <strong>Body (form-data or JSON):</strong><br>
-                            client_id: YOUR_CLIENT_ID<br>
-                            client_secret: YOUR_CLIENT_SECRET<br>
-                            code: ${code}<br>
-                            grant_type: authorization_code
-                        </div>
-                        <p>You can use <a href="https://www.postman.com/" target="_blank">Postman</a>, <a href="https://httpie.io/" target="_blank">HTTPie</a>, or curl to make this request.</p>
-                        <p style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 0.9rem;">
-                            <strong>Example with curl:</strong><br>
-                            <code style="font-size: 0.85em; display: block; margin-top: 5px;">
-                                curl -X POST https://www.strava.com/oauth/token \\<br>
-                                &nbsp;&nbsp;-d client_id=YOUR_CLIENT_ID \\<br>
-                                &nbsp;&nbsp;-d client_secret=YOUR_CLIENT_SECRET \\<br>
-                                &nbsp;&nbsp;-d code=${code} \\<br>
-                                &nbsp;&nbsp;-d grant_type=authorization_code
-                            </code>
-                        </p>
-                        <p>Once you get the response, paste the <strong>access_token</strong> below:</p>
-                        <div style="margin: 20px 0;">
-                            <label for="stravaTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Access Token:</label>
-                            <input type="text" id="stravaTokenInput" placeholder="Paste your access token here" 
-                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                        </div>
-                        <button id="saveStravaToken" class="location-btn office-btn" style="width: 100%; margin-top: 10px;">
-                            Save Token
-                        </button>
-                    `;
-                    
-                    // Re-initialize the save button listener after innerHTML replacement
-                    setTimeout(() => {
-                        const saveBtn = document.getElementById('saveStravaToken');
-                        if (saveBtn) {
-                            // Remove any existing listeners by cloning
-                            const newSaveBtn = saveBtn.cloneNode(true);
-                            saveBtn.replaceWith(newSaveBtn);
-                            // Add event listener to the new button
-                            newSaveBtn.addEventListener('click', () => {
-                                const token = document.getElementById('stravaTokenInput').value.trim();
-                                if (token) {
-                                    saveStravaToken(token, null);
-                                } else {
-                                    alert('Please enter an access token');
-                                }
-                            });
-                        }
-                    }, 0);
+                // Re-initialize the save button listener after innerHTML replacement
+                setTimeout(() => {
+                    const saveBtn = document.getElementById('saveStravaToken');
+                    if (saveBtn) {
+                        // Remove any existing listeners by cloning
+                        const newSaveBtn = saveBtn.cloneNode(true);
+                        saveBtn.replaceWith(newSaveBtn);
+                        // Add event listener to the new button
+                        newSaveBtn.addEventListener('click', () => {
+                            const token = document.getElementById('stravaTokenInput').value.trim();
+                            if (token) {
+                                saveStravaToken(token, null);
+                            } else {
+                                alert('Please enter an access token');
+                            }
+                        });
+                    }
+                }, 0);
                 }
             }
         }
@@ -172,51 +170,6 @@ function handleStravaOAuthCallback() {
     }
 }
 
-// Handle OAuth callback from Garmin
-function handleGarminOAuthCallback() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const oauthToken = urlParams.get('oauth_token');
-    const oauthVerifier = urlParams.get('oauth_verifier');
-    const error = urlParams.get('error');
-    
-    if (error) {
-        console.error('Garmin OAuth error:', error);
-        // Show error in settings modal if it's open
-        const statusDiv = document.getElementById('garminAuthStatus');
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = `❌ Authorization failed: ${error}`;
-        } else {
-            alert(`Garmin authorization failed: ${error}`);
-        }
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return;
-    }
-    
-    if (oauthToken && oauthVerifier) {
-        // Try to automatically exchange token for access token using stored credentials
-        const storedClientId = sessionStorage.getItem('garminClientId');
-        const storedClientSecret = sessionStorage.getItem('garminClientSecret');
-        
-        if (storedClientId && storedClientSecret) {
-            // Open settings modal if not already open to show status
-            const settingsModal = document.getElementById('settingsModal');
-            const configSection = document.getElementById('garminConfigSection');
-            if (settingsModal && configSection) {
-                settingsModal.style.display = 'block';
-                configSection.style.display = 'block';
-            }
-            // Automatically exchange token for access token
-            exchangeGarminCodeForToken(oauthVerifier, storedClientId, storedClientSecret);
-        }
-        
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-}
 
 function initializeApp() {
     // Load saved user name
@@ -1580,7 +1533,7 @@ function checkStravaConnection() {
                 loadStravaActivitiesFromDB().then(() => {
                     console.log('Loaded activities from database, now syncing new ones...');
                     // Then fetch new activities from Strava API
-                    fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
+                fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
                 }).catch(error => {
                     console.error('Error loading activities from database:', error);
                     // Still try to fetch from API
@@ -1713,7 +1666,7 @@ function saveStravaToken(accessToken, refreshToken) {
                 // Load existing activities from database first, then fetch new ones
                 loadStravaActivitiesFromDB().then(() => {
                     // Fetch new activities from Strava API
-                    fetchStravaActivities(accessToken.trim(), refreshToken ? refreshToken.trim() : null);
+                fetchStravaActivities(accessToken.trim(), refreshToken ? refreshToken.trim() : null);
                 }).catch(error => {
                     console.error('Error loading activities from database:', error);
                     // Still try to fetch from API
@@ -2029,15 +1982,8 @@ function initializeGarminButtons() {
     const connectBtn = document.getElementById('garminConnectBtn');
     const disconnectBtn = document.getElementById('garminDisconnectBtn');
     const configSection = document.getElementById('garminConfigSection');
-    const startAuthBtn = document.getElementById('garminStartAuth');
+    const saveTokenBtn = document.getElementById('garminSaveToken');
     const cancelConfigBtn = document.getElementById('garminCancelConfig');
-    const currentUrlDisplay = document.getElementById('garminCurrentUrlDisplay');
-    
-    // Set current URL as default redirect URI
-    if (currentUrlDisplay) {
-        const currentUrl = window.location.origin + window.location.pathname;
-        currentUrlDisplay.textContent = currentUrl;
-    }
     
     if (connectBtn) {
         connectBtn.addEventListener('click', () => {
@@ -2061,10 +2007,15 @@ function initializeGarminButtons() {
         });
     }
     
-    // Handle Start Authorization button
-    if (startAuthBtn) {
-        startAuthBtn.addEventListener('click', () => {
-            startGarminOAuth();
+    // Handle Save Token button
+    if (saveTokenBtn) {
+        saveTokenBtn.addEventListener('click', () => {
+            const sessionToken = document.getElementById('garminSessionToken').value.trim();
+            if (!sessionToken) {
+                alert('Please enter a session token');
+                return;
+            }
+            saveGarminToken(sessionToken);
         });
     }
     
@@ -2074,9 +2025,9 @@ function initializeGarminButtons() {
             if (configSection) {
                 configSection.style.display = 'none';
                 // Clear form fields
-                document.getElementById('garminClientId').value = '';
-                document.getElementById('garminClientSecret').value = '';
-                document.getElementById('garminRedirectUri').value = '';
+                document.getElementById('garminEmail').value = '';
+                document.getElementById('garminPassword').value = '';
+                document.getElementById('garminSessionToken').value = '';
                 const statusDiv = document.getElementById('garminAuthStatus');
                 if (statusDiv) {
                     statusDiv.style.display = 'none';
@@ -2087,151 +2038,6 @@ function initializeGarminButtons() {
     }
 }
 
-// Start Garmin OAuth flow
-function startGarminOAuth() {
-    const clientId = document.getElementById('garminClientId').value.trim();
-    const clientSecret = document.getElementById('garminClientSecret').value.trim();
-    const redirectUri = document.getElementById('garminRedirectUri').value.trim() || 
-                        (window.location.origin + window.location.pathname);
-    const statusDiv = document.getElementById('garminAuthStatus');
-    
-    // Validate inputs
-    if (!clientId) {
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = '❌ Please enter your Consumer Key';
-        } else {
-            alert('Please enter your Consumer Key');
-        }
-        return;
-    }
-    
-    if (!clientSecret) {
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = '❌ Please enter your Consumer Secret';
-        } else {
-            alert('Please enter your Consumer Secret');
-        }
-        return;
-    }
-    
-    // Store credentials in sessionStorage for token exchange
-    sessionStorage.setItem('garminClientId', clientId);
-    sessionStorage.setItem('garminClientSecret', clientSecret);
-    
-    // Show status
-    if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.style.background = '#e3f2fd';
-        statusDiv.style.color = '#1565c0';
-        statusDiv.innerHTML = '⏳ Redirecting to Garmin for authorization...';
-    }
-    
-    // Build OAuth URL (Garmin Health API uses OAuth 2.0)
-    // Note: Garmin's actual OAuth endpoint may vary - this is a placeholder
-    const oauthUrl = `https://connect.garmin.com/oauthConfirm?` +
-        `oauth_consumer_key=${encodeURIComponent(clientId)}&` +
-        `oauth_callback=${encodeURIComponent(redirectUri)}`;
-    
-    // Redirect to Garmin
-    window.location.href = oauthUrl;
-}
-
-// Exchange authorization code for access token (Garmin)
-async function exchangeGarminCodeForToken(code, clientId, clientSecret) {
-    const statusDiv = document.getElementById('garminAuthStatus');
-    
-    // Show status
-    if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.style.background = '#e3f2fd';
-        statusDiv.style.color = '#1565c0';
-        statusDiv.innerHTML = '⏳ Exchanging authorization code for access token...';
-    }
-    
-    try {
-        // Note: Garmin uses OAuth 1.0a for Connect API, which is more complex
-        // For simplicity, this is a placeholder that would need to be adapted
-        // to Garmin's actual OAuth implementation
-        const formData = new URLSearchParams();
-        formData.append('oauth_consumer_key', clientId);
-        formData.append('oauth_consumer_secret', clientSecret);
-        formData.append('oauth_token', code);
-        formData.append('oauth_verifier', code);
-        
-        // Garmin's actual token exchange endpoint
-        const response = await fetch('https://connectapi.garmin.com/oauth-service/oauth/exchange/user/2.0', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: formData.toString()
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.text();
-            throw new Error(errorData || `HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        // Clear stored credentials from sessionStorage
-        sessionStorage.removeItem('garminClientId');
-        sessionStorage.removeItem('garminClientSecret');
-        
-        // Save tokens (Garmin uses oauth_token and oauth_token_secret)
-        if (data.oauth_token) {
-            saveGarminToken(data.oauth_token, data.oauth_token_secret || null);
-            
-            // Show success message
-            if (statusDiv) {
-                statusDiv.style.display = 'block';
-                statusDiv.style.background = '#e8f5e9';
-                statusDiv.style.color = '#2e7d32';
-                statusDiv.innerHTML = '✅ Successfully connected to Garmin!';
-            }
-            
-            // Hide config section after a short delay
-            setTimeout(() => {
-                const configSection = document.getElementById('garminConfigSection');
-                if (configSection) {
-                    configSection.style.display = 'none';
-                    // Clear form fields
-                    document.getElementById('garminClientId').value = '';
-                    document.getElementById('garminClientSecret').value = '';
-                    document.getElementById('garminRedirectUri').value = '';
-                    if (statusDiv) {
-                        statusDiv.style.display = 'none';
-                        statusDiv.innerHTML = '';
-                    }
-                }
-            }, 2000);
-        } else {
-            throw new Error('No access token in response');
-        }
-    } catch (error) {
-        console.error('Error exchanging code for token:', error);
-        
-        // Clear stored credentials
-        sessionStorage.removeItem('garminClientId');
-        sessionStorage.removeItem('garminClientSecret');
-        
-        // Show error
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = `❌ Error: ${error.message}. Please try again.`;
-        } else {
-            alert(`Error exchanging authorization code: ${error.message}`);
-        }
-    }
-}
 
 function checkGarminConnection() {
     if (!currentUser || !db) {
@@ -2245,7 +2051,7 @@ function checkGarminConnection() {
     db.collection('users').doc(currentUser).get().then(doc => {
         if (doc.exists) {
             const data = doc.data();
-            const hasToken = data.garminAccessToken && data.garminAccessToken.trim() !== '';
+            const hasToken = data.garminSessionToken && data.garminSessionToken.trim() !== '';
             
             console.log('Checking Garmin connection - hasToken:', hasToken);
             
@@ -2264,11 +2070,11 @@ function checkGarminConnection() {
                 loadGarminActivitiesFromDB().then(() => {
                     console.log('Loaded activities from database, now syncing new ones...');
                     // Then fetch new activities from Garmin API
-                    fetchGarminActivities(data.garminAccessToken, data.garminAccessTokenSecret);
+                    fetchGarminActivities(data.garminSessionToken);
                 }).catch(error => {
                     console.error('Error loading activities from database:', error);
                     // Still try to fetch from API
-                    fetchGarminActivities(data.garminAccessToken, data.garminAccessTokenSecret);
+                    fetchGarminActivities(data.garminSessionToken);
                 });
             } else {
                 console.log('No token found');
@@ -2363,25 +2169,32 @@ async function saveGarminActivitiesToDB(newActivities) {
     }
 }
 
-function saveGarminToken(accessToken, tokenSecret) {
+function saveGarminToken(sessionToken) {
     if (!currentUser || !db) {
         alert('Please enter your name first');
         return;
     }
     
-    if (!accessToken || accessToken.trim() === '') {
-        alert('Please enter a valid access token');
+    if (!sessionToken || sessionToken.trim() === '') {
+        alert('Please enter a valid session token');
         return;
+    }
+    
+    const statusDiv = document.getElementById('garminAuthStatus');
+    
+    // Show status
+    if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#e3f2fd';
+        statusDiv.style.color = '#1565c0';
+        statusDiv.innerHTML = '⏳ Saving token and testing connection...';
     }
     
     const userDocRef = db.collection('users').doc(currentUser);
     
     userDocRef.get().then(doc => {
         const data = doc.exists ? doc.data() : {};
-        data.garminAccessToken = accessToken.trim();
-        if (tokenSecret && tokenSecret.trim() !== '') {
-            data.garminAccessTokenSecret = tokenSecret.trim();
-        }
+        data.garminSessionToken = sessionToken.trim();
         
         userDocRef.set(data, { merge: true })
             .then(() => {
@@ -2391,15 +2204,39 @@ function saveGarminToken(accessToken, tokenSecret) {
                 document.getElementById('garminConnectBtn').style.display = 'none';
                 document.getElementById('garminDisconnectBtn').style.display = 'inline-flex';
                 
+                // Show success
+                if (statusDiv) {
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.background = '#e8f5e9';
+                    statusDiv.style.color = '#2e7d32';
+                    statusDiv.innerHTML = '✅ Token saved! Fetching activities...';
+                }
+                
                 // Load existing activities from database first, then fetch new ones
                 loadGarminActivitiesFromDB().then(() => {
                     // Fetch new activities from Garmin API
-                    fetchGarminActivities(accessToken.trim(), tokenSecret ? tokenSecret.trim() : null);
+                    fetchGarminActivities(sessionToken.trim());
                 }).catch(error => {
                     console.error('Error loading activities from database:', error);
                     // Still try to fetch from API
-                    fetchGarminActivities(accessToken.trim(), tokenSecret ? tokenSecret.trim() : null);
+                    fetchGarminActivities(sessionToken.trim());
                 });
+                
+                // Hide config section after a short delay
+                setTimeout(() => {
+                    const configSection = document.getElementById('garminConfigSection');
+                    if (configSection) {
+                        configSection.style.display = 'none';
+                        // Clear form fields
+                        document.getElementById('garminEmail').value = '';
+                        document.getElementById('garminPassword').value = '';
+                        document.getElementById('garminSessionToken').value = '';
+                        if (statusDiv) {
+                            statusDiv.style.display = 'none';
+                            statusDiv.innerHTML = '';
+                        }
+                    }
+                }, 3000);
                 
                 // Also check connection to ensure consistency
                 setTimeout(() => {
@@ -2408,11 +2245,25 @@ function saveGarminToken(accessToken, tokenSecret) {
             })
             .catch(error => {
                 console.error('Error saving Garmin token:', error);
-                alert('Error saving token. Please try again.');
+                if (statusDiv) {
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.background = '#ffebee';
+                    statusDiv.style.color = '#c62828';
+                    statusDiv.innerHTML = '❌ Error saving token. Please try again.';
+                } else {
+                    alert('Error saving token. Please try again.');
+                }
             });
     }).catch(error => {
         console.error('Error accessing database:', error);
-        alert('Error accessing database. Please try again.');
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#ffebee';
+            statusDiv.style.color = '#c62828';
+            statusDiv.innerHTML = '❌ Error accessing database. Please try again.';
+        } else {
+            alert('Error accessing database. Please try again.');
+        }
     });
 }
 
@@ -2423,8 +2274,7 @@ function disconnectGarmin(silent = false) {
     
     userDocRef.get().then(doc => {
         const data = doc.exists ? doc.data() : {};
-        data.garminAccessToken = null;
-        data.garminAccessTokenSecret = null;
+        data.garminSessionToken = null;
         data.garminActivities = null; // Clear activities from database
         
         userDocRef.set(data, { merge: true })
@@ -2445,9 +2295,9 @@ function disconnectGarmin(silent = false) {
     });
 }
 
-async function fetchGarminActivities(accessToken, tokenSecret) {
-    if (!accessToken || accessToken.trim() === '') {
-        console.log('No access token provided');
+async function fetchGarminActivities(sessionToken) {
+    if (!sessionToken || sessionToken.trim() === '') {
+        console.log('No session token provided');
         return;
     }
     
@@ -2498,26 +2348,37 @@ async function fetchGarminActivities(accessToken, tokenSecret) {
             console.log('First time fetching Garmin activities - getting last 3 months');
         }
         
-        // Fetch activities from Garmin API
-        // Note: Garmin's actual API endpoint may vary - this is a placeholder
-        const response = await fetch(`https://connectapi.garmin.com/activity-service/activities/search/activities?start=${after}&limit=200`, {
+        // Fetch activities from Garmin Connect API using session token
+        // Note: Garmin Connect API uses cookies/session, so we need to use the session token
+        // The garminconnect library handles this server-side, but we'll try to use the token directly
+        // This may require a backend proxy due to CORS restrictions
+        const response = await fetch(`https://connectapi.garmin.com/activitylist-service/activities/search/activities?start=${after}&limit=200`, {
+            method: 'GET',
             headers: {
-                'Authorization': `Bearer ${accessToken.trim()}`,
-                'Accept': 'application/json'
-            }
+                'Cookie': `SESSIONID=${sessionToken.trim()}`,
+                'Accept': 'application/json',
+                'Referer': 'https://connect.garmin.com/'
+            },
+            credentials: 'include'
         });
         
-        if (response.status === 401) {
+        if (response.status === 401 || response.status === 403) {
             // Token expired or invalid
             console.log('Garmin token expired or invalid - reconnecting required');
             disconnectGarmin(true); // Silent disconnect
-            alert('Garmin token is invalid or expired. Please reconnect with a valid token.');
+            alert('Garmin session token is invalid or expired. Please run the Python script again to get a new token.');
             return;
         }
         
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Garmin API error:', response.status, errorText);
+            
+            // If CORS error, provide helpful message
+            if (response.status === 0 || errorText.includes('CORS')) {
+                throw new Error('CORS error: Garmin API cannot be accessed directly from browser. You may need a backend proxy service.');
+            }
+            
             throw new Error(`Garmin API error: ${response.status} - ${errorText}`);
         }
         
@@ -2541,10 +2402,10 @@ async function fetchGarminActivities(accessToken, tokenSecret) {
         const newActivitiesByDate = {};
         newActivities.forEach(activity => {
             // Parse startTimeLocal or startTimeGMT
-            const dateString = activity.startTimeLocal || activity.startTimeGMT;
+            const dateString = activity.startTimeLocal || activity.startTimeGMT || activity.beginTimestamp;
             
             // Parse the date string
-            const dateMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            const dateMatch = dateString ? dateString.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
             
             if (dateMatch) {
                 const year = dateMatch[1];
@@ -2559,7 +2420,7 @@ async function fetchGarminActivities(accessToken, tokenSecret) {
             } else {
                 // Fallback to old method if string format is unexpected
                 console.warn('Unexpected date format:', dateString);
-                const activityDate = new Date(dateString);
+                const activityDate = dateString ? new Date(dateString) : new Date(activity.beginTimestamp * 1000);
                 const year = activityDate.getFullYear();
                 const month = activityDate.getMonth();
                 const day = activityDate.getDate();
@@ -2582,7 +2443,13 @@ async function fetchGarminActivities(accessToken, tokenSecret) {
         
     } catch (error) {
         console.error('Error fetching Garmin activities:', error);
-        alert(`Error fetching Garmin activities: ${error.message}. Please check your token and try again.`);
+        
+        // Show helpful error message
+        const errorMsg = error.message.includes('CORS') 
+            ? 'Garmin API cannot be accessed directly from browser due to CORS restrictions. You may need to set up a backend proxy service that uses the garminconnect Python library.'
+            : `Error fetching Garmin activities: ${error.message}. Please check your token and try again.`;
+        
+        alert(errorMsg);
     }
 }
 

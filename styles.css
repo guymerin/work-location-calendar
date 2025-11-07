@@ -620,11 +620,13 @@ h1 {
 
 .modal-content {
     background-color: white;
-    margin: 15% auto;
+    margin: 5% auto;
     padding: 30px;
     border-radius: 16px;
     width: 90%;
     max-width: 400px;
+    max-height: 85vh;
+    overflow-y: auto;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     animation: slideDown 0.3s;
 }
@@ -707,6 +709,28 @@ h1 {
 /* Settings Modal Styles */
 .settings-modal-content {
     max-width: 550px;
+    max-height: 85vh;
+    overflow-y: auto;
+    margin: 3% auto;
+}
+
+/* Custom scrollbar for settings modal */
+.settings-modal-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.settings-modal-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.settings-modal-content::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.settings-modal-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .settings-section {
