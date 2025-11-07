@@ -193,6 +193,61 @@
                 </div>
             </div>
 
+            <!-- Garmin Connection Section -->
+            <div class="settings-section">
+                <h4 class="settings-section-title">⌚ Garmin Connection</h4>
+                <div class="strava-connection-status">
+                    <button id="garminConnectBtn" class="strava-btn" style="display: none; background: #007cc3;">
+                        <span>⌚</span> Connect Garmin
+                    </button>
+                    <button id="garminDisconnectBtn" class="strava-btn disconnect" style="display: none; background: #007cc3;">
+                        <span>⌚</span> Disconnect Garmin
+                    </button>
+                </div>
+                
+                <!-- Garmin Configuration Section (shown when Connect is clicked) -->
+                <div id="garminConfigSection" class="strava-config-section" style="display: none; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                    <h5 style="margin-bottom: 15px; color: #667eea; font-size: 1rem;">Enter Your Garmin API Credentials</h5>
+                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">
+                        Get these from <a href="https://developer.garmin.com/" target="_blank" style="color: #667eea;">Garmin Developer Portal</a>
+                    </p>
+                    
+                    <div class="strava-config-form" style="display: flex; flex-direction: column; gap: 15px;">
+                        <div>
+                            <label for="garminClientId" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Consumer Key *</label>
+                            <input type="text" id="garminClientId" placeholder="Enter your Garmin Consumer Key" 
+                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                        </div>
+                        
+                        <div>
+                            <label for="garminClientSecret" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Consumer Secret *</label>
+                            <input type="password" id="garminClientSecret" placeholder="Enter your Garmin Consumer Secret" 
+                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                        </div>
+                        
+                        <div>
+                            <label for="garminRedirectUri" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Redirect URI</label>
+                            <input type="text" id="garminRedirectUri" placeholder="https://your-domain.com" 
+                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                            <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">
+                                Leave empty to use current page URL: <span id="garminCurrentUrlDisplay"></span>
+                            </small>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button id="garminStartAuth" class="strava-btn" style="flex: 1; background: #007cc3;">
+                                <span>🔗</span> Authorize with Garmin
+                            </button>
+                            <button id="garminCancelConfig" class="strava-btn disconnect" style="flex: 0 0 auto; background: #007cc3;">
+                                Cancel
+                            </button>
+                        </div>
+                        
+                        <div id="garminAuthStatus" style="margin-top: 10px; padding: 10px; border-radius: 8px; display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Weekly Goals Section -->
             <div class="settings-section">
                 <h4 class="settings-section-title">🎯 Weekly Goals</h4>
