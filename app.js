@@ -381,10 +381,11 @@ function renderCalendar() {
         }
     }
 
-    // Add next month's days for remaining cells in the last week
+    // Add next month's days to complete the last week (always show complete weeks)
     const totalCells = startingDayOfWeek + daysInMonth;
     const remainingCells = 7 - (totalCells % 7);
-    if (remainingCells < 7 && remainingCells > 0) {
+    
+    if (remainingCells > 0 && remainingCells < 7) {
         const nextMonth = month === 11 ? 0 : month + 1;
         const nextYear = month === 11 ? year + 1 : year;
         for (let i = 1; i <= remainingCells; i++) {
@@ -410,43 +411,45 @@ function renderCalendar() {
         }
     }
     
-    // Ensure we always show complete weeks (at least 6 weeks = 42 day cells)
-    // If we have less than 42 day cells, add more days from next month
-    const dayElementsCount = calendarGrid.querySelectorAll('.calendar-day').length;
-    if (dayElementsCount < 42) {
-        const nextMonth = month === 11 ? 0 : month + 1;
-        const nextYear = month === 11 ? year + 1 : year;
-        const nextMonthFirstDay = new Date(nextYear, nextMonth, 1);
-        const daysInNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+    // After all days are added, remove weeks that are entirely from next month or previous month
+    const allDayElements = Array.from(calendarGrid.querySelectorAll('.calendar-day'));
+    const allChildren = Array.from(calendarGrid.children);
+    const statsElements = allChildren.filter(child => child.classList.contains('week-stats-cell'));
+    
+    // Group days into weeks (7 days per week) and track their original positions
+    const weeks = [];
+    for (let i = 0; i < allDayElements.length; i += 7) {
+        weeks.push({
+            days: allDayElements.slice(i, i + 7),
+            startIndex: i
+        });
+    }
+    
+    // Check each week and remove if entirely from next month or previous month
+    for (let weekIndex = weeks.length - 1; weekIndex >= 0; weekIndex--) {
+        const week = weeks[weekIndex];
+        const weekDays = week.days;
         
-        // Calculate how many days we've already added from next month
-        const alreadyAddedNextMonthDays = remainingCells > 0 && remainingCells < 7 ? remainingCells : 0;
-        const startDay = alreadyAddedNextMonthDays + 1;
-        const cellsToAdd = 42 - dayElementsCount;
+        // Check if all days are from next month (they're at the end and have other-month class)
+        const allFromNextMonth = weekDays.every(dayElement => {
+            return dayElement.classList.contains('other-month') && 
+                   !dayElement.classList.contains('today');
+        }) && week.startIndex >= startingDayOfWeek + daysInMonth;
         
-        for (let i = 0; i < cellsToAdd && (startDay + i) <= daysInNextMonth; i++) {
-            const dayNum = startDay + i;
-            const nextDate = new Date(nextYear, nextMonth, dayNum);
-            const nextDayElement = createDayElement(dayNum, nextYear, nextMonth);
-            nextDayElement.classList.add('other-month');
+        // Check if all days are from previous month (they're at the beginning and have other-month class)
+        const allFromPrevMonth = weekDays.every(dayElement => {
+            return dayElement.classList.contains('other-month') && 
+                   !dayElement.classList.contains('today');
+        }) && week.startIndex < startingDayOfWeek;
+        
+        if (allFromNextMonth || allFromPrevMonth) {
+            // Remove this week's days
+            weekDays.forEach(dayElement => dayElement.remove());
             
-            // Highlight today if it falls in next month
-            if (nextDate.toDateString() === today.toDateString()) {
-                nextDayElement.classList.add('today');
-            }
-            
-            // Load location data for next month day
-            loadDayLocation(nextYear, nextMonth, dayNum, nextDayElement);
-            
-            // Load Strava workout data
-            loadStravaWorkout(nextYear, nextMonth, dayNum, nextDayElement);
-            
-            calendarGrid.appendChild(nextDayElement);
-            dayElementsAdded++;
-            
-            // Insert stats cell after Sunday (every 7 day elements)
-            if (dayElementsAdded % 7 === 0) {
-                calendarGrid.appendChild(createPlaceholderStatsCell());
+            // Remove corresponding stats cell
+            // Stats cells are inserted after every 7 days, so weekIndex corresponds to statsElements index
+            if (weekIndex < statsElements.length) {
+                statsElements[weekIndex].remove();
             }
         }
     }
@@ -786,6 +789,7 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
             const daysWithWeightTraining = new Set();
             const daysWithYoga = new Set();
             let weekHasStarted = false;
+            let allDaysFromNextMonth = true;
             
             // Get today's date at midnight for comparison
             const today = new Date();
@@ -802,6 +806,7 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                 // Determine if this is from previous month, current month, or next month
                 const isOtherMonth = dayElement.classList.contains('other-month');
                 let date;
+                let isFromNextMonth = false;
                 
                 // Calculate global index in the grid (only counting day elements)
                 // We need to count how many day elements come before this one in the full grid
@@ -820,9 +825,15 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                         date = new Date(prevYear, prevMonth, day);
                     } else {
                         date = new Date(nextYear, nextMonth, day);
+                        isFromNextMonth = true;
                     }
                 } else {
                     date = new Date(year, month, day);
+                }
+                
+                // If any day is not from next month, then not all days are from next month
+                if (!isFromNextMonth) {
+                    allDaysFromNextMonth = false;
                 }
                 
                 // Check if this day has occurred (is today or in the past)
@@ -862,8 +873,8 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                 }
             });
             
-            // Only show stats if the week has started
-            if (weekHasStarted) {
+            // Only show stats if the week has started AND not all days are from next month
+            if (weekHasStarted && !allDaysFromNextMonth) {
                 const runningDays = daysWithRunning.size;
                 const weightTrainingDays = daysWithWeightTraining.size;
                 const yogaDays = daysWithYoga.size;
@@ -877,17 +888,19 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                 // Build stats HTML based on active filters
                 let statsHTML = '';
                 
-                // Work stats (office and home) - upper half, one line
+                // Work stats (office) - upper half, one line
                 if (activeFilters.work) {
+                    const officeGoalClass = userGoals.office > 0 ? (officeGoalMet ? 'goal-met' : 'goal-not-met') : '';
+                    const officeTooltip = userGoals.office > 0 
+                        ? `Office Days: ${officeDays}/${userGoals.office}${officeGoalMet ? ' ✓ Goal Met' : ''}`
+                        : `Office Days: ${officeDays}`;
                     statsHTML += `
                         <div class="stat-row">
                             <div class="stat-item">
-                                <span class="stat-label">🏢</span>
-                                <span class="stat-value">${officeDays}${officeGoalMet ? '<span class="goal-met">✓</span>' : ''}</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">🏠</span>
-                                <span class="stat-value">${homeDays}</span>
+                                <span class="stat-label ${officeGoalClass}" title="${officeTooltip}">
+                                    🏢
+                                    <span class="stat-badge-number">${officeDays}</span>
+                                </span>
                             </div>
                         </div>
                     `;
@@ -895,19 +908,39 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                 
                 // Health stats (running, weights, yoga) - lower half, one line
                 if (activeFilters.health) {
+                    const runningGoalClass = userGoals.running > 0 ? (runningGoalMet ? 'goal-met' : 'goal-not-met') : '';
+                    const weightsGoalClass = userGoals.weights > 0 ? (weightsGoalMet ? 'goal-met' : 'goal-not-met') : '';
+                    const yogaGoalClass = userGoals.yoga > 0 ? (yogaGoalMet ? 'goal-met' : 'goal-not-met') : '';
+                    
+                    const runningTooltip = userGoals.running > 0 
+                        ? `Running Days: ${runningDays}/${userGoals.running}${runningGoalMet ? ' ✓ Goal Met' : ''}`
+                        : `Running Days: ${runningDays}`;
+                    const weightsTooltip = userGoals.weights > 0 
+                        ? `Weight Training Days: ${weightTrainingDays}/${userGoals.weights}${weightsGoalMet ? ' ✓ Goal Met' : ''}`
+                        : `Weight Training Days: ${weightTrainingDays}`;
+                    const yogaTooltip = userGoals.yoga > 0 
+                        ? `Yoga Days: ${yogaDays}/${userGoals.yoga}${yogaGoalMet ? ' ✓ Goal Met' : ''}`
+                        : `Yoga Days: ${yogaDays}`;
+                    
                     statsHTML += `
                         <div class="stat-row">
                             <div class="stat-item">
-                                <span class="stat-label">🏃</span>
-                                <span class="stat-value">${runningDays}${runningGoalMet ? '<span class="goal-met">✓</span>' : ''}</span>
+                                <span class="stat-label ${runningGoalClass}" title="${runningTooltip}">
+                                    🏃
+                                    <span class="stat-badge-number">${runningDays}</span>
+                                </span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">🏋️</span>
-                                <span class="stat-value">${weightTrainingDays}${weightsGoalMet ? '<span class="goal-met">✓</span>' : ''}</span>
+                                <span class="stat-label ${weightsGoalClass}" title="${weightsTooltip}">
+                                    🏋️
+                                    <span class="stat-badge-number">${weightTrainingDays}</span>
+                                </span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">🧘</span>
-                                <span class="stat-value">${yogaDays}${yogaGoalMet ? '<span class="goal-met">✓</span>' : ''}</span>
+                                <span class="stat-label ${yogaGoalClass}" title="${yogaTooltip}">
+                                    🧘
+                                    <span class="stat-badge-number">${yogaDays}</span>
+                                </span>
                             </div>
                         </div>
                     `;
@@ -1455,9 +1488,16 @@ function checkStravaConnection() {
             }
             
             if (hasToken) {
-                console.log('Token found, fetching activities...');
-                // Fetch activities
-                fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
+                // Load existing activities from database first
+                loadStravaActivitiesFromDB().then(() => {
+                    console.log('Loaded activities from database, now syncing new ones...');
+                    // Then fetch new activities from Strava API
+                    fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
+                }).catch(error => {
+                    console.error('Error loading activities from database:', error);
+                    // Still try to fetch from API
+                    fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
+                });
             } else {
                 console.log('No token found');
             }
@@ -1471,6 +1511,84 @@ function checkStravaConnection() {
     }).catch(error => {
         console.error('Error checking Strava connection:', error);
     });
+}
+
+// Load Strava activities from Firestore
+async function loadStravaActivitiesFromDB() {
+    if (!currentUser || !db) {
+        return Promise.resolve();
+    }
+    
+    try {
+        const userDoc = await db.collection('users').doc(currentUser).get();
+        if (userDoc.exists) {
+            const data = userDoc.data();
+            const storedActivities = data.stravaActivities || {};
+            
+            // Convert stored activities back to the stravaActivities format
+            stravaActivities = {};
+            Object.keys(storedActivities).forEach(dateKey => {
+                stravaActivities[dateKey] = storedActivities[dateKey];
+            });
+            
+            console.log(`Loaded ${Object.keys(stravaActivities).length} days with activities from database`);
+            
+            // Update calendar to show loaded activities
+            renderCalendar();
+        }
+    } catch (error) {
+        console.error('Error loading Strava activities from database:', error);
+        throw error;
+    }
+}
+
+// Save Strava activities to Firestore
+async function saveStravaActivitiesToDB(newActivities) {
+    if (!currentUser || !db) {
+        return;
+    }
+    
+    try {
+        const userDocRef = db.collection('users').doc(currentUser);
+        const userDoc = await userDocRef.get();
+        
+        const existingData = userDoc.exists ? userDoc.data() : {};
+        const existingActivities = existingData.stravaActivities || {};
+        
+        // Merge new activities with existing ones
+        // For each date, merge activity arrays (avoiding duplicates by activity ID)
+        const mergedActivities = { ...existingActivities };
+        
+        Object.keys(newActivities).forEach(dateKey => {
+            if (!mergedActivities[dateKey]) {
+                mergedActivities[dateKey] = [];
+            }
+            
+            // Get existing activity IDs for this date
+            const existingIds = new Set(mergedActivities[dateKey].map(a => a.id));
+            
+            // Add new activities that don't already exist
+            newActivities[dateKey].forEach(activity => {
+                if (!existingIds.has(activity.id)) {
+                    mergedActivities[dateKey].push(activity);
+                }
+            });
+        });
+        
+        // Update the document with merged activities
+        await userDocRef.set({
+            stravaActivities: mergedActivities
+        }, { merge: true });
+        
+        console.log('Saved Strava activities to database');
+        
+        // Update in-memory cache
+        stravaActivities = mergedActivities;
+        
+    } catch (error) {
+        console.error('Error saving Strava activities to database:', error);
+        throw error;
+    }
 }
 
 function saveStravaToken(accessToken, refreshToken) {
@@ -1504,8 +1622,15 @@ function saveStravaToken(accessToken, refreshToken) {
                 document.getElementById('stravaConnectBtn').style.display = 'none';
                 document.getElementById('stravaDisconnectBtn').style.display = 'inline-flex';
                 
-                // Fetch activities
-                fetchStravaActivities(accessToken.trim(), refreshToken ? refreshToken.trim() : null);
+                // Load existing activities from database first, then fetch new ones
+                loadStravaActivitiesFromDB().then(() => {
+                    // Fetch new activities from Strava API
+                    fetchStravaActivities(accessToken.trim(), refreshToken ? refreshToken.trim() : null);
+                }).catch(error => {
+                    console.error('Error loading activities from database:', error);
+                    // Still try to fetch from API
+                    fetchStravaActivities(accessToken.trim(), refreshToken ? refreshToken.trim() : null);
+                });
                 
                 // Also check connection to ensure consistency
                 setTimeout(() => {
@@ -1531,6 +1656,7 @@ function disconnectStrava(silent = false) {
         const data = doc.exists ? doc.data() : {};
         data.stravaAccessToken = null;
         data.stravaRefreshToken = null;
+        data.stravaActivities = null; // Clear activities from database
         
         userDocRef.set(data, { merge: true })
             .then(() => {
@@ -1557,18 +1683,52 @@ async function fetchStravaActivities(accessToken, refreshToken) {
         return;
     }
     
-    console.log('Fetching Strava activities...');
-    
     try {
-        // Calculate date range (last 3 months and next month)
+        // Get existing activities to find the latest timestamp
+        let latestActivityTimestamp = 0;
+        const existingActivityIds = new Set();
+        
+        // Find the latest activity timestamp from existing activities
+        Object.keys(stravaActivities).forEach(dateKey => {
+            stravaActivities[dateKey].forEach(activity => {
+                existingActivityIds.add(activity.id);
+                // Use start_date (UTC timestamp) if available, otherwise parse start_date_local
+                if (activity.start_date) {
+                    const timestamp = new Date(activity.start_date).getTime() / 1000;
+                    if (timestamp > latestActivityTimestamp) {
+                        latestActivityTimestamp = timestamp;
+                    }
+                } else if (activity.start_date_local) {
+                    // Parse the timestamp from start_date_local
+                    const date = new Date(activity.start_date_local);
+                    const timestamp = date.getTime() / 1000;
+                    if (timestamp > latestActivityTimestamp) {
+                        latestActivityTimestamp = timestamp;
+                    }
+                }
+            });
+        });
+        
+        // Calculate date range
         const now = new Date();
-        const threeMonthsAgo = new Date(now);
-        threeMonthsAgo.setMonth(now.getMonth() - 3);
         const nextMonth = new Date(now);
         nextMonth.setMonth(now.getMonth() + 1);
-        
-        const after = Math.floor(threeMonthsAgo.getTime() / 1000);
         const before = Math.floor(nextMonth.getTime() / 1000);
+        
+        // If we have existing activities, only fetch new ones (after latest timestamp)
+        // Otherwise, fetch last 3 months worth
+        let after;
+        if (latestActivityTimestamp > 0) {
+            // Fetch activities after the latest one we have (subtract 1 day to be safe)
+            after = latestActivityTimestamp - 86400; // 1 day in seconds
+            console.log(`Fetching new Strava activities after timestamp: ${after} (${new Date(after * 1000).toISOString()})`);
+        } else {
+            // First time fetching - get last 3 months
+            const threeMonthsAgo = new Date(now);
+            threeMonthsAgo.setMonth(now.getMonth() - 3);
+            after = Math.floor(threeMonthsAgo.getTime() / 1000);
+            console.log('First time fetching Strava activities - getting last 3 months');
+        }
         
         // Fetch activities from Strava API
         const response = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&before=${before}&per_page=200`, {
@@ -1592,14 +1752,23 @@ async function fetchStravaActivities(accessToken, refreshToken) {
         }
         
         const activities = await response.json();
-        console.log(`Fetched ${activities.length} Strava activities`);
+        console.log(`Fetched ${activities.length} Strava activities from API`);
         
-        // Group activities by date
-        stravaActivities = {};
-        activities.forEach(activity => {
+        // Filter out activities we already have
+        const newActivities = activities.filter(activity => !existingActivityIds.has(activity.id));
+        console.log(`${newActivities.length} new activities (${activities.length - newActivities.length} already exist)`);
+        
+        if (newActivities.length === 0) {
+            console.log('No new activities to sync');
+            // Still update calendar in case we loaded from DB
+            renderCalendar();
+            return;
+        }
+        
+        // Group new activities by date
+        const newActivitiesByDate = {};
+        newActivities.forEach(activity => {
             // Parse start_date_local directly from the string to avoid timezone issues
-            // start_date_local from Strava is in format "YYYY-MM-DDTHH:mm:ss" in local timezone
-            // Extract date components directly from the string to avoid timezone conversion issues
             const dateString = activity.start_date_local;
             
             // Parse the date string: "2025-11-05T06:00:00" or "2025-11-05T06:00:00Z" or similar
@@ -1615,10 +1784,10 @@ async function fetchStravaActivities(accessToken, refreshToken) {
                 // Create a date key using the extracted components
                 const dateKey = `${year}-${month}-${day}`;
                 
-                if (!stravaActivities[dateKey]) {
-                    stravaActivities[dateKey] = [];
+                if (!newActivitiesByDate[dateKey]) {
+                    newActivitiesByDate[dateKey] = [];
                 }
-                stravaActivities[dateKey].push(activity);
+                newActivitiesByDate[dateKey].push(activity);
             } else {
                 // Fallback to old method if string format is unexpected
                 console.warn('Unexpected date format:', dateString);
@@ -1628,29 +1797,17 @@ async function fetchStravaActivities(accessToken, refreshToken) {
                 const day = activityDate.getDate();
                 const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
-                if (!stravaActivities[dateKey]) {
-                    stravaActivities[dateKey] = [];
+                if (!newActivitiesByDate[dateKey]) {
+                    newActivitiesByDate[dateKey] = [];
                 }
-                stravaActivities[dateKey].push(activity);
+                newActivitiesByDate[dateKey].push(activity);
             }
         });
         
-        // Debug: Log activities for Nov 3rd, 4th, and 5th, 2025
-        const debugDates = ['2025-11-03', '2025-11-04', '2025-11-05'];
-        debugDates.forEach(dateKey => {
-            if (stravaActivities[dateKey]) {
-                console.log(`${dateKey} activities (${stravaActivities[dateKey].length}):`, 
-                    stravaActivities[dateKey].map(a => ({
-                        type: a.type,
-                        name: a.name,
-                        start_date_local: a.start_date_local,
-                        id: a.id,
-                        parsed_date: formatDateKey(new Date(a.start_date_local))
-                    })));
-            }
-        });
+        // Save new activities to database
+        await saveStravaActivitiesToDB(newActivitiesByDate);
         
-        console.log('Activities grouped by date:', Object.keys(stravaActivities).length, 'days with activities');
+        console.log('New activities grouped by date:', Object.keys(newActivitiesByDate).length, 'days with new activities');
         
         // Update calendar to show workout icons
         renderCalendar();
