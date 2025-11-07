@@ -66,77 +66,102 @@ function handleStravaOAuthCallback() {
     
     if (error) {
         console.error('Strava OAuth error:', error);
-        alert(`Strava authorization failed: ${error}`);
+        // Show error in settings modal if it's open
+        const statusDiv = document.getElementById('stravaAuthStatus');
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#ffebee';
+            statusDiv.style.color = '#c62828';
+            statusDiv.innerHTML = `❌ Authorization failed: ${error}`;
+        } else {
+            alert(`Strava authorization failed: ${error}`);
+        }
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
     }
     
     if (code) {
-        // Show the code to the user with instructions
-        const modal = document.getElementById('stravaModal');
-        if (modal) {
-            modal.style.display = 'block';
-            const tokenInput = document.getElementById('stravaTokenInput');
-            if (tokenInput) {
-                tokenInput.placeholder = 'Authorization code received! Follow the steps below to exchange it for a token.';
+        // Try to automatically exchange code for token using stored credentials
+        const storedClientId = sessionStorage.getItem('stravaClientId');
+        const storedClientSecret = sessionStorage.getItem('stravaClientSecret');
+        
+        if (storedClientId && storedClientSecret) {
+            // Open settings modal if not already open to show status
+            const settingsModal = document.getElementById('settingsModal');
+            const configSection = document.getElementById('stravaConfigSection');
+            if (settingsModal && configSection) {
+                settingsModal.style.display = 'block';
+                configSection.style.display = 'block';
             }
-            
-            // Show instructions for exchanging code
-            const instructions = document.querySelector('.strava-connect-section');
-            if (instructions) {
-                instructions.innerHTML = `
-                    <p style="color: #4caf50; font-weight: 600;">✅ Authorization code received!</p>
-                    <p>Your authorization code: <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${code}</code></p>
-                    <p>To exchange this code for an access token, you need to make a POST request:</p>
-                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; font-family: monospace; font-size: 0.9em;">
-                        <strong>POST</strong> https://www.strava.com/oauth/token<br><br>
-                        <strong>Body (form-data or JSON):</strong><br>
-                        client_id: YOUR_CLIENT_ID<br>
-                        client_secret: YOUR_CLIENT_SECRET<br>
-                        code: ${code}<br>
-                        grant_type: authorization_code
-                    </div>
-                    <p>You can use <a href="https://www.postman.com/" target="_blank">Postman</a>, <a href="https://httpie.io/" target="_blank">HTTPie</a>, or curl to make this request.</p>
-                    <p style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 0.9rem;">
-                        <strong>Example with curl:</strong><br>
-                        <code style="font-size: 0.85em; display: block; margin-top: 5px;">
-                            curl -X POST https://www.strava.com/oauth/token \\<br>
-                            &nbsp;&nbsp;-d client_id=YOUR_CLIENT_ID \\<br>
-                            &nbsp;&nbsp;-d client_secret=YOUR_CLIENT_SECRET \\<br>
-                            &nbsp;&nbsp;-d code=${code} \\<br>
-                            &nbsp;&nbsp;-d grant_type=authorization_code
-                        </code>
-                    </p>
-                    <p>Once you get the response, paste the <strong>access_token</strong> below:</p>
-                    <div style="margin: 20px 0;">
-                        <label for="stravaTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Access Token:</label>
-                        <input type="text" id="stravaTokenInput" placeholder="Paste your access token here" 
-                               style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                    </div>
-                    <button id="saveStravaToken" class="location-btn office-btn" style="width: 100%; margin-top: 10px;">
-                        Save Token
-                    </button>
-                `;
+            // Automatically exchange code for token
+            exchangeStravaCodeForToken(code, storedClientId, storedClientSecret);
+        } else {
+            // Fallback to old manual method if credentials not stored
+            const modal = document.getElementById('stravaModal');
+            if (modal) {
+                modal.style.display = 'block';
+                const tokenInput = document.getElementById('stravaTokenInput');
+                if (tokenInput) {
+                    tokenInput.placeholder = 'Authorization code received! Follow the steps below to exchange it for a token.';
+                }
                 
-                // Re-initialize the save button listener after innerHTML replacement
-                setTimeout(() => {
-                    const saveBtn = document.getElementById('saveStravaToken');
-                    if (saveBtn) {
-                        // Remove any existing listeners by cloning
-                        const newSaveBtn = saveBtn.cloneNode(true);
-                        saveBtn.replaceWith(newSaveBtn);
-                        // Add event listener to the new button
-                        newSaveBtn.addEventListener('click', () => {
-                            const token = document.getElementById('stravaTokenInput').value.trim();
-                            if (token) {
-                                saveStravaToken(token, null);
-                            } else {
-                                alert('Please enter an access token');
-                            }
-                        });
-                    }
-                }, 0);
+                // Show instructions for exchanging code
+                const instructions = document.querySelector('.strava-connect-section');
+                if (instructions) {
+                    instructions.innerHTML = `
+                        <p style="color: #4caf50; font-weight: 600;">✅ Authorization code received!</p>
+                        <p>Your authorization code: <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${code}</code></p>
+                        <p>To exchange this code for an access token, you need to make a POST request:</p>
+                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; font-family: monospace; font-size: 0.9em;">
+                            <strong>POST</strong> https://www.strava.com/oauth/token<br><br>
+                            <strong>Body (form-data or JSON):</strong><br>
+                            client_id: YOUR_CLIENT_ID<br>
+                            client_secret: YOUR_CLIENT_SECRET<br>
+                            code: ${code}<br>
+                            grant_type: authorization_code
+                        </div>
+                        <p>You can use <a href="https://www.postman.com/" target="_blank">Postman</a>, <a href="https://httpie.io/" target="_blank">HTTPie</a>, or curl to make this request.</p>
+                        <p style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 0.9rem;">
+                            <strong>Example with curl:</strong><br>
+                            <code style="font-size: 0.85em; display: block; margin-top: 5px;">
+                                curl -X POST https://www.strava.com/oauth/token \\<br>
+                                &nbsp;&nbsp;-d client_id=YOUR_CLIENT_ID \\<br>
+                                &nbsp;&nbsp;-d client_secret=YOUR_CLIENT_SECRET \\<br>
+                                &nbsp;&nbsp;-d code=${code} \\<br>
+                                &nbsp;&nbsp;-d grant_type=authorization_code
+                            </code>
+                        </p>
+                        <p>Once you get the response, paste the <strong>access_token</strong> below:</p>
+                        <div style="margin: 20px 0;">
+                            <label for="stravaTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Access Token:</label>
+                            <input type="text" id="stravaTokenInput" placeholder="Paste your access token here" 
+                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                        </div>
+                        <button id="saveStravaToken" class="location-btn office-btn" style="width: 100%; margin-top: 10px;">
+                            Save Token
+                        </button>
+                    `;
+                    
+                    // Re-initialize the save button listener after innerHTML replacement
+                    setTimeout(() => {
+                        const saveBtn = document.getElementById('saveStravaToken');
+                        if (saveBtn) {
+                            // Remove any existing listeners by cloning
+                            const newSaveBtn = saveBtn.cloneNode(true);
+                            saveBtn.replaceWith(newSaveBtn);
+                            // Add event listener to the new button
+                            newSaveBtn.addEventListener('click', () => {
+                                const token = document.getElementById('stravaTokenInput').value.trim();
+                                if (token) {
+                                    saveStravaToken(token, null);
+                                } else {
+                                    alert('Please enter an access token');
+                                }
+                            });
+                        }
+                    }, 0);
+                }
             }
         }
         
@@ -1059,6 +1084,16 @@ function initializeStravaButtons() {
     const stravaModal = document.getElementById('stravaModal');
     const stravaModalClose = document.getElementById('stravaModalClose');
     const saveTokenBtn = document.getElementById('saveStravaToken');
+    const configSection = document.getElementById('stravaConfigSection');
+    const startAuthBtn = document.getElementById('stravaStartAuth');
+    const cancelConfigBtn = document.getElementById('stravaCancelConfig');
+    const currentUrlDisplay = document.getElementById('currentUrlDisplay');
+    
+    // Set current URL as default redirect URI
+    if (currentUrlDisplay) {
+        const currentUrl = window.location.origin + window.location.pathname;
+        currentUrlDisplay.textContent = currentUrl;
+    }
     
     if (connectBtn) {
         connectBtn.addEventListener('click', () => {
@@ -1066,7 +1101,12 @@ function initializeStravaButtons() {
                 alert('Please enter your name first');
                 return;
             }
-            stravaModal.style.display = 'block';
+            // Show configuration section instead of opening separate modal
+            if (configSection) {
+                configSection.style.display = 'block';
+                // Scroll to the config section
+                configSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         });
     }
     
@@ -1098,12 +1138,182 @@ function initializeStravaButtons() {
         });
     }
     
+    // Handle Start Authorization button
+    if (startAuthBtn) {
+        startAuthBtn.addEventListener('click', () => {
+            startStravaOAuth();
+        });
+    }
+    
+    // Handle Cancel button
+    if (cancelConfigBtn) {
+        cancelConfigBtn.addEventListener('click', () => {
+            if (configSection) {
+                configSection.style.display = 'none';
+                // Clear form fields
+                document.getElementById('stravaClientId').value = '';
+                document.getElementById('stravaClientSecret').value = '';
+                document.getElementById('stravaRedirectUri').value = '';
+                const statusDiv = document.getElementById('stravaAuthStatus');
+                if (statusDiv) {
+                    statusDiv.style.display = 'none';
+                    statusDiv.innerHTML = '';
+                }
+            }
+        });
+    }
+    
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
         if (e.target === stravaModal) {
             stravaModal.style.display = 'none';
         }
     });
+}
+
+// Start Strava OAuth flow
+function startStravaOAuth() {
+    const clientId = document.getElementById('stravaClientId').value.trim();
+    const clientSecret = document.getElementById('stravaClientSecret').value.trim();
+    const redirectUri = document.getElementById('stravaRedirectUri').value.trim() || 
+                        (window.location.origin + window.location.pathname);
+    const statusDiv = document.getElementById('stravaAuthStatus');
+    
+    // Validate inputs
+    if (!clientId) {
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#ffebee';
+            statusDiv.style.color = '#c62828';
+            statusDiv.innerHTML = '❌ Please enter your Client ID';
+        } else {
+            alert('Please enter your Client ID');
+        }
+        return;
+    }
+    
+    if (!clientSecret) {
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#ffebee';
+            statusDiv.style.color = '#c62828';
+            statusDiv.innerHTML = '❌ Please enter your Client Secret';
+        } else {
+            alert('Please enter your Client Secret');
+        }
+        return;
+    }
+    
+    // Store credentials in sessionStorage for token exchange
+    sessionStorage.setItem('stravaClientId', clientId);
+    sessionStorage.setItem('stravaClientSecret', clientSecret);
+    
+    // Show status
+    if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#e3f2fd';
+        statusDiv.style.color = '#1565c0';
+        statusDiv.innerHTML = '⏳ Redirecting to Strava for authorization...';
+    }
+    
+    // Build OAuth URL
+    const oauthUrl = `https://www.strava.com/oauth/authorize?` +
+        `client_id=${encodeURIComponent(clientId)}&` +
+        `response_type=code&` +
+        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `approval_prompt=force&` +
+        `scope=activity:read_all`;
+    
+    // Redirect to Strava
+    window.location.href = oauthUrl;
+}
+
+// Exchange authorization code for access token
+async function exchangeStravaCodeForToken(code, clientId, clientSecret) {
+    const statusDiv = document.getElementById('stravaAuthStatus');
+    
+    // Show status
+    if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#e3f2fd';
+        statusDiv.style.color = '#1565c0';
+        statusDiv.innerHTML = '⏳ Exchanging authorization code for access token...';
+    }
+    
+    try {
+        // Exchange code for token (Strava API requires form-data)
+        const formData = new URLSearchParams();
+        formData.append('client_id', clientId);
+        formData.append('client_secret', clientSecret);
+        formData.append('code', code);
+        formData.append('grant_type', 'authorization_code');
+        
+        const response = await fetch('https://www.strava.com/oauth/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData.toString()
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Clear stored credentials from sessionStorage
+        sessionStorage.removeItem('stravaClientId');
+        sessionStorage.removeItem('stravaClientSecret');
+        
+        // Save tokens
+        if (data.access_token) {
+            saveStravaToken(data.access_token, data.refresh_token || null);
+            
+            // Show success message
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#e8f5e9';
+                statusDiv.style.color = '#2e7d32';
+                statusDiv.innerHTML = '✅ Successfully connected to Strava!';
+            }
+            
+            // Hide config section after a short delay
+            setTimeout(() => {
+                const configSection = document.getElementById('stravaConfigSection');
+                if (configSection) {
+                    configSection.style.display = 'none';
+                    // Clear form fields
+                    document.getElementById('stravaClientId').value = '';
+                    document.getElementById('stravaClientSecret').value = '';
+                    document.getElementById('stravaRedirectUri').value = '';
+                    if (statusDiv) {
+                        statusDiv.style.display = 'none';
+                        statusDiv.innerHTML = '';
+                    }
+                }
+            }, 2000);
+        } else {
+            throw new Error('No access token in response');
+        }
+    } catch (error) {
+        console.error('Error exchanging code for token:', error);
+        
+        // Clear stored credentials
+        sessionStorage.removeItem('stravaClientId');
+        sessionStorage.removeItem('stravaClientSecret');
+        
+        // Show error
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#ffebee';
+            statusDiv.style.color = '#c62828';
+            statusDiv.innerHTML = `❌ Error: ${error.message}. Please try again.`;
+        } else {
+            alert(`Error exchanging authorization code: ${error.message}`);
+        }
+    }
 }
 
 function initializeSettingsModal() {

@@ -149,6 +149,48 @@
                         <span>🏃</span> Disconnect Strava
                     </button>
                 </div>
+                
+                <!-- Strava Configuration Section (shown when Connect is clicked) -->
+                <div id="stravaConfigSection" class="strava-config-section" style="display: none; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                    <h5 style="margin-bottom: 15px; color: #667eea; font-size: 1rem;">Enter Your Strava API Credentials</h5>
+                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">
+                        Get these from <a href="https://www.strava.com/settings/api" target="_blank" style="color: #667eea;">Strava API Settings</a>
+                    </p>
+                    
+                    <div class="strava-config-form" style="display: flex; flex-direction: column; gap: 15px;">
+                        <div>
+                            <label for="stravaClientId" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Client ID *</label>
+                            <input type="text" id="stravaClientId" placeholder="Enter your Strava Client ID" 
+                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                        </div>
+                        
+                        <div>
+                            <label for="stravaClientSecret" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Client Secret *</label>
+                            <input type="password" id="stravaClientSecret" placeholder="Enter your Strava Client Secret" 
+                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                        </div>
+                        
+                        <div>
+                            <label for="stravaRedirectUri" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Redirect URI</label>
+                            <input type="text" id="stravaRedirectUri" placeholder="https://your-domain.com" 
+                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                            <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">
+                                Leave empty to use current page URL: <span id="currentUrlDisplay"></span>
+                            </small>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button id="stravaStartAuth" class="strava-btn" style="flex: 1;">
+                                <span>🔗</span> Authorize with Strava
+                            </button>
+                            <button id="stravaCancelConfig" class="strava-btn disconnect" style="flex: 0 0 auto;">
+                                Cancel
+                            </button>
+                        </div>
+                        
+                        <div id="stravaAuthStatus" style="margin-top: 10px; padding: 10px; border-radius: 8px; display: none;"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- Weekly Goals Section -->
