@@ -255,9 +255,10 @@ function setUserName() {
     localStorage.setItem('currentUser', currentUser);
     updateUserStatus();
     
-    // Check Strava connection status after setting user
+    // Check Strava and Garmin connection status after setting user
     setTimeout(() => {
         checkStravaConnection();
+        checkGarminConnection();
     }, 100);
     
     renderCalendar(); // This will also update stats
@@ -762,6 +763,16 @@ function isYogaActivity(activity) {
            activityName.includes('meditation');
 }
 
+// Helper function to check if an activity is cold plunge
+function isColdPlungeActivity(activity) {
+    const activityType = activity.type || 'Run';
+    const activityName = (activity.name || '').toLowerCase();
+    // Check if it's a Workout type with "plunge" in the name
+    return (activityType === 'Workout' && activityName.includes('plunge')) ||
+           activityName.includes('cold plunge') ||
+           activityName.includes('coldplunge');
+}
+
 function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
     if (!currentUser || !db) return;
     
@@ -782,7 +793,7 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
             office: 3,
             running: 0,
             weights: 0,
-            yoga: 0
+            coldPlunge: 0
         };
         
         // Find all stats placeholders and calculate stats for their corresponding weeks
@@ -802,7 +813,7 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
             let homeDays = 0;
             const daysWithRunning = new Set();
             const daysWithWeightTraining = new Set();
-            const daysWithYoga = new Set();
+            const daysWithColdPlunge = new Set();
             let weekHasStarted = false;
             let allDaysFromNextMonth = true;
             
@@ -881,8 +892,8 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                         if (isWeightTrainingActivity(activity)) {
                             daysWithWeightTraining.add(dateKey);
                         }
-                        if (isYogaActivity(activity)) {
-                            daysWithYoga.add(dateKey);
+                        if (isColdPlungeActivity(activity)) {
+                            daysWithColdPlunge.add(dateKey);
                         }
                     });
                 }
@@ -905,9 +916,11 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                             activityName.includes('weight') || activityName.includes('f45') || activityName.includes('crossfit') || activityName.includes('gym')) {
                             daysWithWeightTraining.add(dateKey);
                         }
-                        // Check for yoga
-                        if (activityType === 'yoga' || activityName.includes('yoga') || activityName.includes('stretching') || activityName.includes('meditation')) {
-                            daysWithYoga.add(dateKey);
+                        // Check for cold plunge
+                        if ((activityType === 'workout' && activityName.includes('plunge')) || 
+                            activityName.includes('cold plunge') || 
+                            activityName.includes('coldplunge')) {
+                            daysWithColdPlunge.add(dateKey);
                         }
                     });
                 }
@@ -917,13 +930,13 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
             if (weekHasStarted && !allDaysFromNextMonth) {
                 const runningDays = daysWithRunning.size;
                 const weightTrainingDays = daysWithWeightTraining.size;
-                const yogaDays = daysWithYoga.size;
+                const coldPlungeDays = daysWithColdPlunge.size;
                 
                 // Check if goals are met
                 const officeGoalMet = userGoals.office > 0 && officeDays >= userGoals.office;
                 const runningGoalMet = userGoals.running > 0 && runningDays >= userGoals.running;
                 const weightsGoalMet = userGoals.weights > 0 && weightTrainingDays >= userGoals.weights;
-                const yogaGoalMet = userGoals.yoga > 0 && yogaDays >= userGoals.yoga;
+                const coldPlungeGoalMet = userGoals.coldPlunge > 0 && coldPlungeDays >= userGoals.coldPlunge;
                 
                 // Build stats HTML based on active filters
                 let statsHTML = '';
@@ -946,11 +959,11 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                     `;
                 }
                 
-                // Health stats (running, weights, yoga) - lower half, one line
+                // Health stats (running, weights, cold plunge) - lower half, one line
                 if (activeFilters.health) {
                     const runningGoalClass = userGoals.running > 0 ? (runningGoalMet ? 'goal-met' : 'goal-not-met') : '';
                     const weightsGoalClass = userGoals.weights > 0 ? (weightsGoalMet ? 'goal-met' : 'goal-not-met') : '';
-                    const yogaGoalClass = userGoals.yoga > 0 ? (yogaGoalMet ? 'goal-met' : 'goal-not-met') : '';
+                    const coldPlungeGoalClass = userGoals.coldPlunge > 0 ? (coldPlungeGoalMet ? 'goal-met' : 'goal-not-met') : '';
                     
                     const runningTooltip = userGoals.running > 0 
                         ? `Running Days: ${runningDays}/${userGoals.running}${runningGoalMet ? ' ✓ Goal Met' : ''}`
@@ -958,9 +971,9 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                     const weightsTooltip = userGoals.weights > 0 
                         ? `Weight Training Days: ${weightTrainingDays}/${userGoals.weights}${weightsGoalMet ? ' ✓ Goal Met' : ''}`
                         : `Weight Training Days: ${weightTrainingDays}`;
-                    const yogaTooltip = userGoals.yoga > 0 
-                        ? `Yoga Days: ${yogaDays}/${userGoals.yoga}${yogaGoalMet ? ' ✓ Goal Met' : ''}`
-                        : `Yoga Days: ${yogaDays}`;
+                    const coldPlungeTooltip = userGoals.coldPlunge > 0 
+                        ? `Cold Plunge Days: ${coldPlungeDays}/${userGoals.coldPlunge}${coldPlungeGoalMet ? ' ✓ Goal Met' : ''}`
+                        : `Cold Plunge Days: ${coldPlungeDays}`;
                     
                     statsHTML += `
                         <div class="stat-row">
@@ -977,9 +990,9 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                                 </span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label ${yogaGoalClass}" title="${yogaTooltip}">
-                                    🧘
-                                    <span class="stat-badge-number">${yogaDays}</span>
+                                <span class="stat-label ${coldPlungeGoalClass}" title="${coldPlungeTooltip}">
+                                    🧊
+                                    <span class="stat-badge-number">${coldPlungeDays}</span>
                                 </span>
                             </div>
                         </div>
@@ -1277,16 +1290,17 @@ function startStravaOAuth() {
         return;
     }
     
-    // Store credentials in sessionStorage for token exchange
+    // Store credentials and redirect URI in sessionStorage for token exchange
     sessionStorage.setItem('stravaClientId', clientId);
     sessionStorage.setItem('stravaClientSecret', clientSecret);
+    sessionStorage.setItem('stravaRedirectUri', redirectUri);
     
-    // Show status
+    // Show status with redirect URI info
     if (statusDiv) {
         statusDiv.style.display = 'block';
         statusDiv.style.background = '#e3f2fd';
         statusDiv.style.color = '#1565c0';
-        statusDiv.innerHTML = '⏳ Redirecting to Strava for authorization...';
+        statusDiv.innerHTML = `⏳ Redirecting to Strava for authorization...<br><small style="font-size: 0.85em; margin-top: 5px; display: block;">Using redirect URI: ${redirectUri}</small>`;
     }
     
     // Build OAuth URL
@@ -1296,6 +1310,9 @@ function startStravaOAuth() {
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
         `approval_prompt=force&` +
         `scope=activity:read_all`;
+    
+    console.log('Strava OAuth URL:', oauthUrl);
+    console.log('Redirect URI being used:', redirectUri);
     
     // Redirect to Strava
     window.location.href = oauthUrl;
@@ -1314,12 +1331,17 @@ async function exchangeStravaCodeForToken(code, clientId, clientSecret) {
     }
     
     try {
+        // Get the redirect URI that was used (from sessionStorage or current URL)
+        const redirectUri = sessionStorage.getItem('stravaRedirectUri') || 
+                           (window.location.origin + window.location.pathname);
+        
         // Exchange code for token (Strava API requires form-data)
         const formData = new URLSearchParams();
         formData.append('client_id', clientId);
         formData.append('client_secret', clientSecret);
         formData.append('code', code);
         formData.append('grant_type', 'authorization_code');
+        formData.append('redirect_uri', redirectUri); // Required by Strava
         
         const response = await fetch('https://www.strava.com/oauth/token', {
             method: 'POST',
@@ -1331,7 +1353,17 @@ async function exchangeStravaCodeForToken(code, clientId, clientSecret) {
         
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+            let errorMessage = errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+            
+            // Provide more helpful error message for redirect_uri errors
+            if (errorData.errors && errorData.errors.length > 0) {
+                const redirectError = errorData.errors.find(e => e.field === 'redirect_uri');
+                if (redirectError) {
+                    errorMessage = `Redirect URI mismatch. The redirect URI "${redirectUri}" must exactly match what's configured in your Strava app settings. Please check your Strava API settings at https://www.strava.com/settings/api and ensure the redirect URI matches exactly (including http/https, trailing slashes, etc.).`;
+                }
+            }
+            
+            throw new Error(errorMessage);
         }
         
         const data = await response.json();
@@ -1339,6 +1371,7 @@ async function exchangeStravaCodeForToken(code, clientId, clientSecret) {
         // Clear stored credentials from sessionStorage
         sessionStorage.removeItem('stravaClientId');
         sessionStorage.removeItem('stravaClientSecret');
+        sessionStorage.removeItem('stravaRedirectUri');
         
         // Save tokens
         if (data.access_token) {
@@ -1376,6 +1409,7 @@ async function exchangeStravaCodeForToken(code, clientId, clientSecret) {
         // Clear stored credentials
         sessionStorage.removeItem('stravaClientId');
         sessionStorage.removeItem('stravaClientSecret');
+        sessionStorage.removeItem('stravaRedirectUri');
         
         // Show error
         if (statusDiv) {
@@ -1440,7 +1474,7 @@ function loadUserGoals() {
             document.getElementById('officeGoal').value = goals.office || 3;
             document.getElementById('runningGoal').value = goals.running || 0;
             document.getElementById('weightsGoal').value = goals.weights || 0;
-            document.getElementById('yogaGoal').value = goals.yoga || 0;
+            document.getElementById('coldPlungeGoal').value = goals.coldPlunge || 0;
         }
     }).catch(error => {
         console.error('Error loading goals:', error);
@@ -1453,7 +1487,7 @@ function saveUserGoals() {
     const officeGoal = parseInt(document.getElementById('officeGoal').value) || 0;
     const runningGoal = parseInt(document.getElementById('runningGoal').value) || 0;
     const weightsGoal = parseInt(document.getElementById('weightsGoal').value) || 0;
-    const yogaGoal = parseInt(document.getElementById('yogaGoal').value) || 0;
+    const coldPlungeGoal = parseInt(document.getElementById('coldPlungeGoal').value) || 0;
     
     // Validate inputs
     if (officeGoal < 0 || officeGoal > 5) {
@@ -1468,8 +1502,8 @@ function saveUserGoals() {
         alert('Weight training days must be between 0 and 7');
         return;
     }
-    if (yogaGoal < 0 || yogaGoal > 7) {
-        alert('Yoga days must be between 0 and 7');
+    if (coldPlungeGoal < 0 || coldPlungeGoal > 7) {
+        alert('Cold plunge days must be between 0 and 7');
         return;
     }
     
@@ -1477,7 +1511,7 @@ function saveUserGoals() {
         office: officeGoal,
         running: runningGoal,
         weights: weightsGoal,
-        yoga: yogaGoal
+        coldPlunge: coldPlungeGoal
     };
     
     const userDocRef = db.collection('users').doc(currentUser);
@@ -1528,20 +1562,22 @@ function checkStravaConnection() {
                 disconnectBtn.style.display = hasToken ? 'inline-flex' : 'none';
             }
             
-            if (hasToken) {
-                // Load existing activities from database first
-                loadStravaActivitiesFromDB().then(() => {
+            // Always load activities from database, regardless of token status
+            loadStravaActivitiesFromDB().then(() => {
+                if (hasToken) {
                     console.log('Loaded activities from database, now syncing new ones...');
                     // Then fetch new activities from Strava API
-                fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
-                }).catch(error => {
-                    console.error('Error loading activities from database:', error);
-                    // Still try to fetch from API
                     fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
-                });
-            } else {
-                console.log('No token found');
-            }
+                } else {
+                    console.log('No token found, but loaded existing activities from database');
+                }
+            }).catch(error => {
+                console.error('Error loading activities from database:', error);
+                if (hasToken) {
+                    // Still try to fetch from API if we have a token
+                    fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
+                }
+            });
         } else {
             console.log('No user document found');
             const connectBtn = document.getElementById('stravaConnectBtn');
@@ -1697,17 +1733,23 @@ function disconnectStrava(silent = false) {
         const data = doc.exists ? doc.data() : {};
         data.stravaAccessToken = null;
         data.stravaRefreshToken = null;
-        data.stravaActivities = null; // Clear activities from database
+        // Keep activities in database - don't clear them
         
         userDocRef.set(data, { merge: true })
             .then(() => {
-                stravaActivities = {};
-                checkStravaConnection();
-                renderCalendar();
-                if (!silent) {
-                    // Only show message if user manually disconnected
-                    console.log('Strava disconnected');
-                }
+                // Reload activities from database (they should still be there)
+                loadStravaActivitiesFromDB().then(() => {
+                    checkStravaConnection();
+                    renderCalendar();
+                    if (!silent) {
+                        // Only show message if user manually disconnected
+                        console.log('Strava disconnected, but activities remain in database');
+                    }
+                }).catch(error => {
+                    console.error('Error loading activities after disconnect:', error);
+                    checkStravaConnection();
+                    renderCalendar();
+                });
             })
             .catch(error => {
                 console.error('Error disconnecting Strava:', error);
@@ -1875,6 +1917,11 @@ function getActivityIcon(activity) {
                    activityName.includes('meditation') ||
                    activityType === 'Yoga';
     
+    // Check if activity name contains cold plunge keywords (even if type is "Workout")
+    const isColdPlunge = (activityType === 'Workout' && activityName.includes('plunge')) ||
+                         activityName.includes('cold plunge') ||
+                         activityName.includes('coldplunge');
+    
     // Check if activity name contains snowshoe keywords (even if type is "Hike" or "Walk")
     const isSnowshoe = activityName.includes('snowshoe') || 
                       activityName.includes('snow shoe') ||
@@ -1899,7 +1946,7 @@ function getActivityIcon(activity) {
         'Walk': isSnowshoe ? '🎿' : '🚶', // Use skis icon for snowshoeing
         'Swim': '🏊',
         'Hike': isSnowshoe ? '🎿' : '🥾', // Use skis icon for snowshoeing
-        'Workout': isYoga ? '🧘' : '💪', // Use yoga icon if it's yoga-related
+        'Workout': isColdPlunge ? '🧊' : (isYoga ? '🧘' : '💪'), // Use cold plunge or yoga icon if applicable
         'Yoga': '🧘',
         'Snowshoe': '🎿',
         'WaterSport': '🚣', // Standup paddle icon (rowing/paddling)
@@ -1917,7 +1964,7 @@ function getActivityIcon(activity) {
         return '🚣';
     }
     
-    return typeIcons[activityType] || (isYoga ? '🧘' : (isSnowshoe ? '🎿' : '🏃'));
+    return typeIcons[activityType] || (isColdPlunge ? '🧊' : (isYoga ? '🧘' : (isSnowshoe ? '🎿' : '🏃')));
 }
 
 function loadStravaWorkout(year, month, day, dayElement) {
@@ -2153,10 +2200,13 @@ async function saveGarminActivitiesToDB(newActivities) {
             });
         });
         
-        // Update the document with merged activities
-        await userDocRef.set({
-            garminActivities: mergedActivities
-        }, { merge: true });
+        // Preserve all existing data (including home office data) when updating
+        // Get all existing fields to preserve them
+        const updatedData = { ...existingData };
+        updatedData.garminActivities = mergedActivities;
+        
+        // Update the document with merged activities while preserving all other data
+        await userDocRef.set(updatedData, { merge: true });
         
         console.log('Saved Garmin activities to database');
         
@@ -2209,7 +2259,7 @@ function saveGarminToken(sessionToken) {
                     statusDiv.style.display = 'block';
                     statusDiv.style.background = '#e8f5e9';
                     statusDiv.style.color = '#2e7d32';
-                    statusDiv.innerHTML = '✅ Token saved! Fetching activities...';
+                    statusDiv.innerHTML = '✅ Token saved! Importing all Garmin activities...';
                 }
                 
                 // Load existing activities from database first, then fetch new ones
@@ -2295,6 +2345,40 @@ function disconnectGarmin(silent = false) {
     });
 }
 
+// Helper function to fetch a single page of Garmin activities
+async function fetchGarminActivitiesPage(sessionToken, startTimestamp, limit = 200) {
+    const response = await fetch(`https://connectapi.garmin.com/activitylist-service/activities/search/activities?start=${startTimestamp}&limit=${limit}`, {
+        method: 'GET',
+        headers: {
+            'Cookie': `SESSIONID=${sessionToken.trim()}`,
+            'Accept': 'application/json',
+            'Referer': 'https://connect.garmin.com/'
+        },
+        credentials: 'include'
+    });
+    
+    if (response.status === 401 || response.status === 403) {
+        // Token expired or invalid
+        console.log('Garmin token expired or invalid - reconnecting required');
+        disconnectGarmin(true); // Silent disconnect
+        throw new Error('Garmin session token is invalid or expired. Please run the Python script again to get a new token.');
+    }
+    
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Garmin API error:', response.status, errorText);
+        
+        // If CORS error, provide helpful message
+        if (response.status === 0 || errorText.includes('CORS')) {
+            throw new Error('CORS error: Garmin API cannot be accessed directly from browser. You may need a backend proxy service.');
+        }
+        
+        throw new Error(`Garmin API error: ${response.status} - ${errorText}`);
+    }
+    
+    return await response.json();
+}
+
 async function fetchGarminActivities(sessionToken) {
     if (!sessionToken || sessionToken.trim() === '') {
         console.log('No session token provided');
@@ -2304,93 +2388,125 @@ async function fetchGarminActivities(sessionToken) {
     try {
         // Get existing activities to find the latest timestamp
         let latestActivityTimestamp = 0;
+        let earliestActivityTimestamp = Infinity;
         const existingActivityIds = new Set();
         
-        // Find the latest activity timestamp from existing activities
+        // Find the latest and earliest activity timestamps from existing activities
         Object.keys(garminActivities).forEach(dateKey => {
             garminActivities[dateKey].forEach(activity => {
                 const activityId = activity.activityId || activity.id;
                 existingActivityIds.add(activityId);
                 // Use startTimeGMT if available, otherwise parse startTimeLocal
+                let timestamp = 0;
                 if (activity.startTimeGMT) {
-                    const timestamp = new Date(activity.startTimeGMT).getTime() / 1000;
+                    timestamp = new Date(activity.startTimeGMT).getTime() / 1000;
+                } else if (activity.startTimeLocal) {
+                    timestamp = new Date(activity.startTimeLocal).getTime() / 1000;
+                }
+                
+                if (timestamp > 0) {
                     if (timestamp > latestActivityTimestamp) {
                         latestActivityTimestamp = timestamp;
                     }
-                } else if (activity.startTimeLocal) {
-                    const date = new Date(activity.startTimeLocal);
-                    const timestamp = date.getTime() / 1000;
-                    if (timestamp > latestActivityTimestamp) {
-                        latestActivityTimestamp = timestamp;
+                    if (timestamp < earliestActivityTimestamp) {
+                        earliestActivityTimestamp = timestamp;
                     }
                 }
             });
         });
         
-        // Calculate date range
         const now = new Date();
         const nextMonth = new Date(now);
         nextMonth.setMonth(now.getMonth() + 1);
         const before = Math.floor(nextMonth.getTime() / 1000);
         
-        // If we have existing activities, only fetch new ones (after latest timestamp)
-        // Otherwise, fetch last 3 months worth
+        // Determine if this is the first import (no existing activities)
+        const isFirstImport = latestActivityTimestamp === 0;
+        
         let after;
-        if (latestActivityTimestamp > 0) {
+        let shouldFetchAll = false;
+        
+        if (isFirstImport) {
+            // First time fetching - import ALL historical data
+            // Go back 10 years to get all activities (adjust if needed)
+            const tenYearsAgo = new Date(now);
+            tenYearsAgo.setFullYear(now.getFullYear() - 10);
+            after = Math.floor(tenYearsAgo.getTime() / 1000);
+            shouldFetchAll = true;
+            console.log('First time importing Garmin data - fetching ALL historical activities (last 10 years)');
+        } else {
             // Fetch activities after the latest one we have (subtract 1 day to be safe)
             after = latestActivityTimestamp - 86400; // 1 day in seconds
             console.log(`Fetching new Garmin activities after timestamp: ${after} (${new Date(after * 1000).toISOString()})`);
-        } else {
-            // First time fetching - get last 3 months
-            const threeMonthsAgo = new Date(now);
-            threeMonthsAgo.setMonth(now.getMonth() - 3);
-            after = Math.floor(threeMonthsAgo.getTime() / 1000);
-            console.log('First time fetching Garmin activities - getting last 3 months');
         }
         
-        // Fetch activities from Garmin Connect API using session token
-        // Note: Garmin Connect API uses cookies/session, so we need to use the session token
-        // The garminconnect library handles this server-side, but we'll try to use the token directly
-        // This may require a backend proxy due to CORS restrictions
-        const response = await fetch(`https://connectapi.garmin.com/activitylist-service/activities/search/activities?start=${after}&limit=200`, {
-            method: 'GET',
-            headers: {
-                'Cookie': `SESSIONID=${sessionToken.trim()}`,
-                'Accept': 'application/json',
-                'Referer': 'https://connect.garmin.com/'
-            },
-            credentials: 'include'
-        });
+        // Fetch activities with pagination
+        let allActivities = [];
+        let currentStart = after;
+        let hasMore = true;
+        const limit = 200;
+        let pageCount = 0;
+        const maxPages = shouldFetchAll ? 100 : 10; // Limit pages to avoid infinite loops
         
-        if (response.status === 401 || response.status === 403) {
-            // Token expired or invalid
-            console.log('Garmin token expired or invalid - reconnecting required');
-            disconnectGarmin(true); // Silent disconnect
-            alert('Garmin session token is invalid or expired. Please run the Python script again to get a new token.');
-            return;
-        }
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Garmin API error:', response.status, errorText);
+        while (hasMore && pageCount < maxPages) {
+            pageCount++;
+            console.log(`Fetching Garmin activities page ${pageCount} (start: ${currentStart}, ${new Date(currentStart * 1000).toISOString()})`);
             
-            // If CORS error, provide helpful message
-            if (response.status === 0 || errorText.includes('CORS')) {
-                throw new Error('CORS error: Garmin API cannot be accessed directly from browser. You may need a backend proxy service.');
+            const activities = await fetchGarminActivitiesPage(sessionToken, currentStart, limit);
+            
+            if (activities.length === 0) {
+                hasMore = false;
+                break;
             }
             
-            throw new Error(`Garmin API error: ${response.status} - ${errorText}`);
+            allActivities = allActivities.concat(activities);
+            console.log(`Fetched ${activities.length} activities (total so far: ${allActivities.length})`);
+            
+            // If we got fewer than the limit, we've reached the end
+            if (activities.length < limit) {
+                hasMore = false;
+            } else {
+                // For next page, use the timestamp of the last activity (oldest in this batch)
+                // Activities are typically returned in reverse chronological order (newest first)
+                const lastActivity = activities[activities.length - 1];
+                let lastTimestamp = 0;
+                if (lastActivity.startTimeGMT) {
+                    lastTimestamp = new Date(lastActivity.startTimeGMT).getTime() / 1000;
+                } else if (lastActivity.startTimeLocal) {
+                    lastTimestamp = new Date(lastActivity.startTimeLocal).getTime() / 1000;
+                } else if (lastActivity.beginTimestamp) {
+                    lastTimestamp = lastActivity.beginTimestamp;
+                }
+                
+                // Check if we've reached the current time (for full import)
+                if (shouldFetchAll && lastTimestamp >= before) {
+                    hasMore = false;
+                    console.log('Reached current time, stopping import');
+                } else if (lastTimestamp > 0 && lastTimestamp > currentStart) {
+                    // Use the last activity's timestamp + 1 second as the next start
+                    // This ensures we don't miss any activities and don't get duplicates
+                    currentStart = lastTimestamp + 1;
+                } else {
+                    // No valid timestamp found or timestamp didn't advance - stop fetching
+                    hasMore = false;
+                    console.log('No more activities to fetch or timestamp did not advance');
+                }
+            }
+            
+            // Add a small delay to avoid rate limiting
+            if (hasMore) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
         }
         
-        const activities = await response.json();
-        console.log(`Fetched ${activities.length} Garmin activities from API`);
+        console.log(`Fetched ${allActivities.length} total Garmin activities from API`);
         
         // Filter out activities we already have
-        const newActivities = activities.filter(activity => {
+        const newActivities = allActivities.filter(activity => {
             const activityId = activity.activityId || activity.id;
             return !existingActivityIds.has(activityId);
         });
-        console.log(`${newActivities.length} new activities (${activities.length - newActivities.length} already exist)`);
+        console.log(`${newActivities.length} new activities (${allActivities.length - newActivities.length} already exist)`);
         
         if (newActivities.length === 0) {
             console.log('No new activities to sync');
@@ -2433,13 +2549,24 @@ async function fetchGarminActivities(sessionToken) {
             }
         });
         
-        // Save new activities to database
+        // Save new activities to database (this will preserve home office data)
         await saveGarminActivitiesToDB(newActivitiesByDate);
         
         console.log('New activities grouped by date:', Object.keys(newActivitiesByDate).length, 'days with new activities');
         
         // Update calendar to show workout icons
         renderCalendar();
+        
+        // Show success message for first import
+        if (isFirstImport && newActivities.length > 0) {
+            const statusDiv = document.getElementById('garminAuthStatus');
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#e8f5e9';
+                statusDiv.style.color = '#2e7d32';
+                statusDiv.innerHTML = `✅ Successfully imported ${newActivities.length} Garmin activities!`;
+            }
+        }
         
     } catch (error) {
         console.error('Error fetching Garmin activities:', error);
@@ -2450,6 +2577,15 @@ async function fetchGarminActivities(sessionToken) {
             : `Error fetching Garmin activities: ${error.message}. Please check your token and try again.`;
         
         alert(errorMsg);
+        
+        // Update status div if it exists
+        const statusDiv = document.getElementById('garminAuthStatus');
+        if (statusDiv) {
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#ffebee';
+            statusDiv.style.color = '#c62828';
+            statusDiv.innerHTML = `❌ ${errorMsg}`;
+        }
     }
 }
 
@@ -2528,6 +2664,13 @@ function getGarminActivityIcon(activity) {
         'rowing': '🚣',
         'indoor_rowing': '🚣'
     };
+    
+    // Check for cold plunge keywords
+    if ((activityType === 'workout' && activityName.includes('plunge')) ||
+        activityName.includes('cold plunge') ||
+        activityName.includes('coldplunge')) {
+        return '🧊';
+    }
     
     // Check for yoga keywords
     if (activityName.includes('yoga') || activityName.includes('stretching') || activityName.includes('meditation')) {

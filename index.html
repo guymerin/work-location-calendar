@@ -177,6 +177,9 @@
                             <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">
                                 Leave empty to use current page URL: <span id="currentUrlDisplay"></span>
                             </small>
+                            <small style="color: #d32f2f; font-size: 0.85rem; display: block; margin-top: 5px; font-weight: 600;">
+                                ⚠️ Important: This redirect URI must EXACTLY match what's configured in your Strava app settings (including http/https, trailing slashes, etc.)
+                            </small>
                         </div>
                         
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
@@ -315,11 +318,11 @@ else:
                         <span class="goal-range">0-7 days</span>
                     </div>
                     <div class="goal-setting">
-                        <label for="yogaGoal">
-                            <span class="goal-icon">🧘</span>
-                            <span class="goal-label">Yoga Days</span>
+                        <label for="coldPlungeGoal">
+                            <span class="goal-icon">🧊</span>
+                            <span class="goal-label">Cold Plunge Days</span>
                         </label>
-                        <input type="number" id="yogaGoal" min="0" max="7" value="0">
+                        <input type="number" id="coldPlungeGoal" min="0" max="7" value="0">
                         <span class="goal-range">0-7 days</span>
                     </div>
                     <button id="saveGoals" class="save-goals-btn">
