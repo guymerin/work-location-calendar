@@ -1522,8 +1522,8 @@ function saveUserGoals() {
         userDocRef.set(data, { merge: true })
             .then(() => {
                 console.log('Weekly goals saved successfully');
+                // Close the settings modal
                 document.getElementById('settingsModal').style.display = 'none';
-                alert('Goals saved successfully!');
                 renderCalendar(); // Re-render to show any visual changes
             })
             .catch(error => {
