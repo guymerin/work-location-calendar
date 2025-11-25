@@ -773,6 +773,28 @@ function isColdPlungeActivity(activity) {
            activityName.includes('coldplunge');
 }
 
+// Helper function to check if an activity is hiking
+function isHikingActivity(activity) {
+    const activityType = activity.type || 'Run';
+    const activityName = (activity.name || '').toLowerCase();
+    return activityType === 'Hike' ||
+           activityType === 'Walk' && activityName.includes('hike') ||
+           activityName.includes('hiking');
+}
+
+// Helper function to check if an activity is skiing
+function isSkiActivity(activity) {
+    const activityType = activity.type || 'Run';
+    const activityName = (activity.name || '').toLowerCase();
+    return activityType === 'Snowshoe' ||
+           activityType === 'AlpineSki' ||
+           activityType === 'BackcountrySki' ||
+           activityType === 'NordicSki' ||
+           activityName.includes('ski') ||
+           activityName.includes('snowshoe') ||
+           activityName.includes('snow shoe');
+}
+
 function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
     if (!currentUser || !db) return;
     
@@ -814,6 +836,9 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
             const daysWithRunning = new Set();
             const daysWithWeightTraining = new Set();
             const daysWithColdPlunge = new Set();
+            const daysWithYoga = new Set();
+            const daysWithHiking = new Set();
+            const daysWithSki = new Set();
             let weekHasStarted = false;
             let allDaysFromNextMonth = true;
             
@@ -895,6 +920,15 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                         if (isColdPlungeActivity(activity)) {
                             daysWithColdPlunge.add(dateKey);
                         }
+                        if (isYogaActivity(activity)) {
+                            daysWithYoga.add(dateKey);
+                        }
+                        if (isHikingActivity(activity)) {
+                            daysWithHiking.add(dateKey);
+                        }
+                        if (isSkiActivity(activity)) {
+                            daysWithSki.add(dateKey);
+                        }
                     });
                 }
                 
@@ -922,6 +956,29 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                             activityName.includes('coldplunge')) {
                             daysWithColdPlunge.add(dateKey);
                         }
+                        // Check for yoga
+                        if (activityType === 'yoga' || 
+                            activityName.includes('yoga') || 
+                            activityName.includes('stretching') || 
+                            activityName.includes('meditation')) {
+                            daysWithYoga.add(dateKey);
+                        }
+                        // Check for hiking
+                        if (activityType === 'hiking' || 
+                            (activityType === 'walking' && activityName.includes('hike')) ||
+                            activityName.includes('hiking')) {
+                            daysWithHiking.add(dateKey);
+                        }
+                        // Check for skiing
+                        if (activityType === 'skiing' || 
+                            activityType === 'alpine_skiing' || 
+                            activityType === 'backcountry_skiing' || 
+                            activityType === 'nordic_skiing' ||
+                            activityName.includes('ski') || 
+                            activityName.includes('snowshoe') || 
+                            activityName.includes('snow shoe')) {
+                            daysWithSki.add(dateKey);
+                        }
                     });
                 }
             });
@@ -931,22 +988,26 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                 const runningDays = daysWithRunning.size;
                 const weightTrainingDays = daysWithWeightTraining.size;
                 const coldPlungeDays = daysWithColdPlunge.size;
+                const yogaDays = daysWithYoga.size;
+                const hikingDays = daysWithHiking.size;
+                const skiDays = daysWithSki.size;
                 
                 // Check if goals are met
                 const officeGoalMet = userGoals.office > 0 && officeDays >= userGoals.office;
                 const runningGoalMet = userGoals.running > 0 && runningDays >= userGoals.running;
                 const weightsGoalMet = userGoals.weights > 0 && weightTrainingDays >= userGoals.weights;
                 const coldPlungeGoalMet = userGoals.coldPlunge > 0 && coldPlungeDays >= userGoals.coldPlunge;
+                const yogaGoalMet = userGoals.yoga > 0 && yogaDays >= userGoals.yoga;
+                const hikingGoalMet = userGoals.hiking > 0 && hikingDays >= userGoals.hiking;
+                const skiGoalMet = userGoals.ski > 0 && skiDays >= userGoals.ski;
                 
                 // Build stats HTML based on active filters
                 let statsHTML = '';
                 
-                // Work stats (office) - upper half, one line
-                if (activeFilters.work) {
-                    const officeGoalClass = userGoals.office > 0 ? (officeGoalMet ? 'goal-met' : 'goal-not-met') : '';
-                    const officeTooltip = userGoals.office > 0 
-                        ? `Office Days: ${officeDays}/${userGoals.office}${officeGoalMet ? ' ✓ Goal Met' : ''}`
-                        : `Office Days: ${officeDays}`;
+                // Work stats (office) - only show if goal > 0
+                if (activeFilters.work && userGoals.office > 0) {
+                    const officeGoalClass = officeGoalMet ? 'goal-met' : 'goal-not-met';
+                    const officeTooltip = `Office Days: ${officeDays}/${userGoals.office}${officeGoalMet ? ' ✓ Goal Met' : ''}`;
                     statsHTML += `
                         <div class="stat-row">
                             <div class="stat-item">
@@ -959,44 +1020,62 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
                     `;
                 }
                 
-                // Health stats (running, weights, cold plunge) - lower half, one line
+                // Health stats - only show activities with goals > 0
                 if (activeFilters.health) {
-                    const runningGoalClass = userGoals.running > 0 ? (runningGoalMet ? 'goal-met' : 'goal-not-met') : '';
-                    const weightsGoalClass = userGoals.weights > 0 ? (weightsGoalMet ? 'goal-met' : 'goal-not-met') : '';
-                    const coldPlungeGoalClass = userGoals.coldPlunge > 0 ? (coldPlungeGoalMet ? 'goal-met' : 'goal-not-met') : '';
+                    // Collect all activities with goals > 0
+                    const healthStats = [];
                     
-                    const runningTooltip = userGoals.running > 0 
-                        ? `Running Days: ${runningDays}/${userGoals.running}${runningGoalMet ? ' ✓ Goal Met' : ''}`
-                        : `Running Days: ${runningDays}`;
-                    const weightsTooltip = userGoals.weights > 0 
-                        ? `Weight Training Days: ${weightTrainingDays}/${userGoals.weights}${weightsGoalMet ? ' ✓ Goal Met' : ''}`
-                        : `Weight Training Days: ${weightTrainingDays}`;
-                    const coldPlungeTooltip = userGoals.coldPlunge > 0 
-                        ? `Cold Plunge Days: ${coldPlungeDays}/${userGoals.coldPlunge}${coldPlungeGoalMet ? ' ✓ Goal Met' : ''}`
-                        : `Cold Plunge Days: ${coldPlungeDays}`;
+                    if (userGoals.running > 0) {
+                        const goalClass = runningGoalMet ? 'goal-met' : 'goal-not-met';
+                        const tooltip = `Running Days: ${runningDays}/${userGoals.running}${runningGoalMet ? ' ✓ Goal Met' : ''}`;
+                        healthStats.push({ icon: '🏃', days: runningDays, goalClass, tooltip });
+                    }
                     
-                    statsHTML += `
-                        <div class="stat-row">
-                            <div class="stat-item">
-                                <span class="stat-label ${runningGoalClass}" title="${runningTooltip}">
-                                    🏃
-                                    <span class="stat-badge-number">${runningDays}</span>
-                                </span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label ${weightsGoalClass}" title="${weightsTooltip}">
-                                    🏋️
-                                    <span class="stat-badge-number">${weightTrainingDays}</span>
-                                </span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label ${coldPlungeGoalClass}" title="${coldPlungeTooltip}">
-                                    🧊
-                                    <span class="stat-badge-number">${coldPlungeDays}</span>
-                                </span>
-                            </div>
-                        </div>
-                    `;
+                    if (userGoals.weights > 0) {
+                        const goalClass = weightsGoalMet ? 'goal-met' : 'goal-not-met';
+                        const tooltip = `Weight Training Days: ${weightTrainingDays}/${userGoals.weights}${weightsGoalMet ? ' ✓ Goal Met' : ''}`;
+                        healthStats.push({ icon: '🏋️', days: weightTrainingDays, goalClass, tooltip });
+                    }
+                    
+                    if (userGoals.coldPlunge > 0) {
+                        const goalClass = coldPlungeGoalMet ? 'goal-met' : 'goal-not-met';
+                        const tooltip = `Cold Plunge Days: ${coldPlungeDays}/${userGoals.coldPlunge}${coldPlungeGoalMet ? ' ✓ Goal Met' : ''}`;
+                        healthStats.push({ icon: '🧊', days: coldPlungeDays, goalClass, tooltip });
+                    }
+                    
+                    if (userGoals.yoga > 0) {
+                        const goalClass = yogaGoalMet ? 'goal-met' : 'goal-not-met';
+                        const tooltip = `Yoga Days: ${yogaDays}/${userGoals.yoga}${yogaGoalMet ? ' ✓ Goal Met' : ''}`;
+                        healthStats.push({ icon: '🧘', days: yogaDays, goalClass, tooltip });
+                    }
+                    
+                    if (userGoals.hiking > 0) {
+                        const goalClass = hikingGoalMet ? 'goal-met' : 'goal-not-met';
+                        const tooltip = `Hiking Days: ${hikingDays}/${userGoals.hiking}${hikingGoalMet ? ' ✓ Goal Met' : ''}`;
+                        healthStats.push({ icon: '🥾', days: hikingDays, goalClass, tooltip });
+                    }
+                    
+                    if (userGoals.ski > 0) {
+                        const goalClass = skiGoalMet ? 'goal-met' : 'goal-not-met';
+                        const tooltip = `Ski Days: ${skiDays}/${userGoals.ski}${skiGoalMet ? ' ✓ Goal Met' : ''}`;
+                        healthStats.push({ icon: '🎿', days: skiDays, goalClass, tooltip });
+                    }
+                    
+                    // Only show health stats if there are any goals set
+                    if (healthStats.length > 0) {
+                        statsHTML += '<div class="stat-row">';
+                        healthStats.forEach(stat => {
+                            statsHTML += `
+                                <div class="stat-item">
+                                    <span class="stat-label ${stat.goalClass}" title="${stat.tooltip}">
+                                        ${stat.icon}
+                                        <span class="stat-badge-number">${stat.days}</span>
+                                    </span>
+                                </div>
+                            `;
+                        });
+                        statsHTML += '</div>';
+                    }
                 }
                 
                 // Update the placeholder with filtered stats
@@ -1475,6 +1554,9 @@ function loadUserGoals() {
             document.getElementById('runningGoal').value = goals.running || 0;
             document.getElementById('weightsGoal').value = goals.weights || 0;
             document.getElementById('coldPlungeGoal').value = goals.coldPlunge || 0;
+            document.getElementById('yogaGoal').value = goals.yoga || 0;
+            document.getElementById('hikingGoal').value = goals.hiking || 0;
+            document.getElementById('skiGoal').value = goals.ski || 0;
         }
     }).catch(error => {
         console.error('Error loading goals:', error);
@@ -1488,6 +1570,9 @@ function saveUserGoals() {
     const runningGoal = parseInt(document.getElementById('runningGoal').value) || 0;
     const weightsGoal = parseInt(document.getElementById('weightsGoal').value) || 0;
     const coldPlungeGoal = parseInt(document.getElementById('coldPlungeGoal').value) || 0;
+    const yogaGoal = parseInt(document.getElementById('yogaGoal').value) || 0;
+    const hikingGoal = parseInt(document.getElementById('hikingGoal').value) || 0;
+    const skiGoal = parseInt(document.getElementById('skiGoal').value) || 0;
     
     // Validate inputs
     if (officeGoal < 0 || officeGoal > 5) {
@@ -1506,12 +1591,27 @@ function saveUserGoals() {
         alert('Cold plunge days must be between 0 and 7');
         return;
     }
+    if (yogaGoal < 0 || yogaGoal > 7) {
+        alert('Yoga days must be between 0 and 7');
+        return;
+    }
+    if (hikingGoal < 0 || hikingGoal > 7) {
+        alert('Hiking days must be between 0 and 7');
+        return;
+    }
+    if (skiGoal < 0 || skiGoal > 7) {
+        alert('Ski days must be between 0 and 7');
+        return;
+    }
     
     const goals = {
         office: officeGoal,
         running: runningGoal,
         weights: weightsGoal,
-        coldPlunge: coldPlungeGoal
+        coldPlunge: coldPlungeGoal,
+        yoga: yogaGoal,
+        hiking: hikingGoal,
+        ski: skiGoal
     };
     
     const userDocRef = db.collection('users').doc(currentUser);
