@@ -436,6 +436,10 @@ h1 {
     color: #2196f3;
 }
 
+.location-indicator.nonworkday {
+    color: #ff9800;
+}
+
 .workout-indicator {
     position: absolute;
     top: 2px;
@@ -697,6 +701,11 @@ h1 {
 .office-btn:hover {
     border-color: #2196f3;
     background: #f0f7ff;
+}
+
+.nonworkday-btn:hover {
+    border-color: #ff9800;
+    background: #fff8e1;
 }
 
 .clear-btn:hover {

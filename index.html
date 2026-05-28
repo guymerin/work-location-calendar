@@ -41,7 +41,7 @@
 
         <div id="statsSection" class="stats-section">
             <div class="stat-card">
-                <div class="stat-label">Average Weekly Office Days</div>
+                <div class="stat-label">Average Weekly Work Days</div>
                 <div id="avgWeeklyOffice" class="stat-value">-</div>
                 <div class="stat-description">Only counting weeks with data</div>
             </div>
@@ -80,7 +80,11 @@
                 </button>
                 <button class="location-btn office-btn" data-location="office">
                     <span class="btn-icon">🏢</span>
-                    <span>Office</span>
+                    <span>Work</span>
+                </button>
+                <button class="location-btn nonworkday-btn" data-location="nonworkday">
+                    <span class="btn-icon">🌴</span>
+                    <span>Non Work Day</span>
                 </button>
                 <button class="location-btn clear-btn" data-location="none">
                     <span class="btn-icon">❌</span>
@@ -296,7 +300,7 @@ else:
                     <div class="goal-setting">
                         <label for="officeGoal">
                             <span class="goal-icon">🏢</span>
-                            <span class="goal-label">Office Days</span>
+                            <span class="goal-label">Work Days</span>
                         </label>
                         <input type="number" id="officeGoal" min="0" max="5" value="3">
                         <span class="goal-range">0-5 days</span>

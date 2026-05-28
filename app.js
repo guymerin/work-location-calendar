@@ -587,8 +587,14 @@ function openModal(date) {
         if (location && location !== 'none') {
             const activeBtn = document.querySelector(`[data-location="${location}"]`);
             if (activeBtn) {
-                activeBtn.style.background = location === 'home' ? '#f1f8f4' : '#f0f7ff';
-                activeBtn.style.borderColor = location === 'home' ? '#4caf50' : '#2196f3';
+                const colors = {
+                    home: { bg: '#f1f8f4', border: '#4caf50' },
+                    office: { bg: '#f0f7ff', border: '#2196f3' },
+                    nonworkday: { bg: '#fff8e1', border: '#ff9800' }
+                };
+                const c = colors[location] || colors.office;
+                activeBtn.style.background = c.bg;
+                activeBtn.style.borderColor = c.border;
             }
         }
     });
@@ -632,7 +638,7 @@ function loadDayLocation(year, month, day, dayElement, userData = null) {
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
 
     const updateElement = (data = {}) => {
-        const location = data[dateStr] || (isWeekend ? 'home' : 'none');
+        const location = data[dateStr] || (isWeekend ? 'nonworkday' : 'none');
         updateDayElement(dayElement, location);
     };
 
@@ -652,10 +658,10 @@ function loadLocationForDate(date) {
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
 
     if (currentUserData) {
-        return Promise.resolve(currentUserData[dateStr] || (isWeekend ? 'home' : 'none'));
+        return Promise.resolve(currentUserData[dateStr] || (isWeekend ? 'nonworkday' : 'none'));
     }
 
-    return getCurrentUserData().then(data => data[dateStr] || (isWeekend ? 'home' : 'none'));
+    return getCurrentUserData().then(data => data[dateStr] || (isWeekend ? 'nonworkday' : 'none'));
 }
 
 function updateDayElement(dayElement, location) {
@@ -667,6 +673,9 @@ function updateDayElement(dayElement, location) {
     } else if (location === 'office') {
         indicator.className = 'location-indicator office';
         indicator.textContent = '🏢';
+    } else if (location === 'nonworkday') {
+        indicator.className = 'location-indicator nonworkday';
+        indicator.textContent = '🌴';
     } else {
         indicator.className = 'location-indicator';
         indicator.textContent = '';
@@ -955,7 +964,7 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                 // Work stats (office) - only show if goal > 0
                 if (activeFilters.work && userGoals.office > 0) {
                     const officeGoalClass = officeGoalMet ? 'goal-met' : 'goal-not-met';
-                    const officeTooltip = `Office Days: ${officeDays}/${userGoals.office}${officeGoalMet ? ' ✓ Goal Met' : ''}`;
+                    const officeTooltip = `Work Days: ${officeDays}/${userGoals.office}${officeGoalMet ? ' ✓ Goal Met' : ''}`;
                     statsHTML += `
                         <div class="stat-row">
                             <div class="stat-item">
@@ -1099,7 +1108,7 @@ async function updateStats() {
             let hasData = false; // Track if week has any home or office days
             
             week.days.forEach(location => {
-                if (location === 'home' || location === 'office') {
+                if (location === 'home' || location === 'office' || location === 'nonworkday') {
                     hasData = true;
                 }
                 if (location === 'office') {
