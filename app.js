@@ -44,12 +44,67 @@ try {
 // State management
 let currentDate = new Date();
 let currentUser = localStorage.getItem('currentUser') || '';
+let currentUserData = null;
+let currentUserDataPromise = null;
+let currentUserDocUnsubscribe = null;
 let selectedDate = null;
 let stravaActivities = {}; // Cache of activities by date (YYYY-MM-DD)
 let activeFilters = {
     work: true,
     health: true
 }; // Track which filters are active
+
+function clearCurrentUserData() {
+    currentUserData = null;
+    currentUserDataPromise = null;
+}
+
+function getCurrentUserData() {
+    if (!currentUser || !db) {
+        return Promise.resolve({});
+    }
+    if (currentUserData) {
+        return Promise.resolve(currentUserData);
+    }
+    if (currentUserDataPromise) {
+        return currentUserDataPromise;
+    }
+
+    currentUserDataPromise = db.collection('users').doc(currentUser).get()
+        .then(doc => {
+            currentUserData = doc.exists ? doc.data() : {};
+            return currentUserData;
+        })
+        .catch(error => {
+            console.error('Error loading user data:', error);
+            currentUserData = {};
+            return currentUserData;
+        })
+        .finally(() => {
+            currentUserDataPromise = null;
+        });
+
+    return currentUserDataPromise;
+}
+
+function subscribeToUserDoc() {
+    if (!currentUser || !db) return;
+
+    if (typeof currentUserDocUnsubscribe === 'function') {
+        currentUserDocUnsubscribe();
+        currentUserDocUnsubscribe = null;
+    }
+
+    clearCurrentUserData();
+
+    currentUserDocUnsubscribe = db.collection('users').doc(currentUser).onSnapshot(doc => {
+        currentUserData = doc.exists ? doc.data() : {};
+        renderCalendar();
+        updateStats();
+    }, error => {
+        console.error('User document snapshot error:', error);
+    });
+}
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -210,6 +265,11 @@ function initializeApp() {
     // Initialize Settings modal
     initializeSettingsModal();
     
+    // Subscribe to live user data updates if a user is already selected
+    if (currentUser) {
+        subscribeToUserDoc();
+    }
+
     // Load Strava connection status
     if (currentUser) {
         checkStravaConnection();
@@ -227,12 +287,16 @@ function initializeApp() {
 function initializeModalListeners() {
     // Close button
     const closeBtn = document.querySelector('.close');
-    closeBtn.replaceWith(closeBtn.cloneNode(true));
-    document.querySelector('.close').addEventListener('click', closeModal);
+    if (closeBtn) {
+        const newCloseBtn = closeBtn.cloneNode(true);
+        closeBtn.replaceWith(newCloseBtn);
+        newCloseBtn.addEventListener('click', closeModal);
+    }
     
     // Location buttons
     document.querySelectorAll('.location-btn').forEach(btn => {
-        btn.replaceWith(btn.cloneNode(true));
+        const newBtn = btn.cloneNode(true);
+        btn.replaceWith(newBtn);
     });
     document.querySelectorAll('.location-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -254,12 +318,12 @@ function setUserName() {
     currentUser = name;
     localStorage.setItem('currentUser', currentUser);
     updateUserStatus();
-    
+    clearCurrentUserData();
+    subscribeToUserDoc();
+
     // Check Strava and Garmin connection status after setting user
-    setTimeout(() => {
-        checkStravaConnection();
-        checkGarminConnection();
-    }, 100);
+    checkStravaConnection();
+    checkGarminConnection();
     
     renderCalendar(); // This will also update stats
     updateStats(); // Also update stats directly
@@ -295,9 +359,10 @@ function toggleFilter(filterType) {
     renderCalendar();
 }
 
-function renderCalendar() {
+async function renderCalendar() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
+    const userData = currentUser ? await getCurrentUserData() : null;
     
     // Update month/year display
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -352,7 +417,7 @@ function renderCalendar() {
         }
         
         // Load location data for previous month day
-        loadDayLocation(prevYear, prevMonth, prevDay, prevDayElement);
+        loadDayLocation(prevYear, prevMonth, prevDay, prevDayElement, userData);
         
         // Load Strava workout data
         loadStravaWorkout(prevYear, prevMonth, prevDay, prevDayElement);
@@ -380,7 +445,7 @@ function renderCalendar() {
         }
 
         // Load location data for this day
-        loadDayLocation(year, month, day, dayElement);
+        loadDayLocation(year, month, day, dayElement, userData);
         
         // Load Strava workout data
         loadStravaWorkout(year, month, day, dayElement);
@@ -415,7 +480,7 @@ function renderCalendar() {
             }
             
             // Load location data for next month day
-            loadDayLocation(nextYear, nextMonth, i, nextDayElement);
+            loadDayLocation(nextYear, nextMonth, i, nextDayElement, userData);
             
             calendarGrid.appendChild(nextDayElement);
             dayElementsAdded++;
@@ -470,11 +535,8 @@ function renderCalendar() {
         }
     }
     
-    // Add week summary badges after rendering is complete
-    addWeekSummaries(year, month, startingDayOfWeek, daysInMonth);
-    
     // Add week stats cells after rendering is complete
-    addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth);
+    addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, userData);
     
     // Update stats
     updateStats();
@@ -544,49 +606,42 @@ function saveLocation(date, location) {
 
     const dateStr = formatDateKey(date);
     const userDocRef = db.collection('users').doc(currentUser);
-    
-    userDocRef.get().then(doc => {
-        const data = doc.exists ? doc.data() : {};
-        data[dateStr] = location === 'none' ? null : location;
-        
-        userDocRef.set(data, { merge: true })
-            .then(() => {
-                closeModal();
-                renderCalendar(); // Refresh calendar to show updated location
-            })
-            .catch(error => {
-                console.error('Error saving location:', error);
-                alert('Error saving location. Please try again.');
-            });
-    }).catch(error => {
-        console.error('Error accessing database:', error);
-        alert('Error accessing database. Please try again.');
-    });
+    const value = location === 'none' ? null : location;
+    const update = { [dateStr]: value };
+
+    userDocRef.set(update, { merge: true })
+        .then(() => {
+            if (currentUserData) {
+                currentUserData[dateStr] = value;
+            }
+            closeModal();
+            renderCalendar(); // Refresh calendar to show updated location
+        })
+        .catch(error => {
+            console.error('Error saving location:', error);
+            alert('Error saving location. Please try again.');
+        });
 }
 
-function loadDayLocation(year, month, day, dayElement) {
+function loadDayLocation(year, month, day, dayElement, userData = null) {
     if (!currentUser) return;
 
     const date = new Date(year, month, day);
     const dateStr = formatDateKey(date);
     const dayOfWeek = date.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
-    
-    db.collection('users').doc(currentUser).get().then(doc => {
-        if (doc.exists) {
-            const data = doc.data();
-            // For weekends, default to 'home' if not explicitly set
-            const location = data[dateStr] || (isWeekend ? 'home' : 'none');
-            updateDayElement(dayElement, location);
-        } else {
-            // First time user - auto-set weekends to home
-            if (isWeekend) {
-                updateDayElement(dayElement, 'home');
-            } else {
-                updateDayElement(dayElement, 'none');
-            }
-        }
-    });
+
+    const updateElement = (data = {}) => {
+        const location = data[dateStr] || (isWeekend ? 'home' : 'none');
+        updateDayElement(dayElement, location);
+    };
+
+    if (userData) {
+        updateElement(userData);
+        return;
+    }
+
+    getCurrentUserData().then(updateElement).catch(() => updateElement({}));
 }
 
 function loadLocationForDate(date) {
@@ -595,16 +650,12 @@ function loadLocationForDate(date) {
     const dateStr = formatDateKey(date);
     const dayOfWeek = date.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
-    
-    return db.collection('users').doc(currentUser).get().then(doc => {
-        if (doc.exists) {
-            const data = doc.data();
-            // For weekends, default to 'home' if not explicitly set
-            return data[dateStr] || (isWeekend ? 'home' : 'none');
-        }
-        // First time user - weekends default to home
-        return isWeekend ? 'home' : 'none';
-    });
+
+    if (currentUserData) {
+        return Promise.resolve(currentUserData[dateStr] || (isWeekend ? 'home' : 'none'));
+    }
+
+    return getCurrentUserData().then(data => data[dateStr] || (isWeekend ? 'home' : 'none'));
 }
 
 function updateDayElement(dayElement, location) {
@@ -627,112 +678,6 @@ function formatDateKey(date) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-}
-
-function addWeekSummaries(year, month, startingDayOfWeek, daysInMonth) {
-    if (!currentUser) return;
-    
-    // Calculate previous and next month info
-    const prevMonth = month === 0 ? 11 : month - 1;
-    const prevYear = month === 0 ? year - 1 : year;
-    const nextMonth = month === 11 ? 0 : month + 1;
-    const nextYear = month === 11 ? year + 1 : year;
-    
-    // Get all user data once
-    db.collection('users').doc(currentUser).get().then(doc => {
-        const allDays = document.querySelectorAll('.calendar-day');
-        const data = doc.exists ? doc.data() : {};
-        
-        // Group days into weeks based on calendar grid position (not date's day of week)
-        // Sunday is always in column 7, which is index 6, 13, 20, 27, etc. (index % 7 === 6)
-        let currentWeek = [];
-        let weekStartIndex = 0;
-        
-        allDays.forEach((dayElement, index) => {
-            const dayNumber = dayElement.querySelector('.day-number');
-            
-            // Check if this is Sunday column in the grid (7th column, index % 7 === 6)
-            const isSundayColumn = (index % 7) === 6;
-            
-            if (dayNumber) {
-                const day = parseInt(dayNumber.textContent);
-                if (!isNaN(day)) {
-                    // Determine if this is from previous month, current month, or next month
-                    const isOtherMonth = dayElement.classList.contains('other-month');
-                    let date;
-                    
-                    if (isOtherMonth) {
-                        // First startingDayOfWeek cells with other-month are from previous month
-                        // The rest are from next month
-                        if (index < startingDayOfWeek) {
-                            // Previous month
-                            date = new Date(prevYear, prevMonth, day);
-                        } else {
-                            // Next month
-                            date = new Date(nextYear, nextMonth, day);
-                        }
-                    } else {
-                        // Current month
-                        date = new Date(year, month, day);
-                    }
-                    
-                    // Get location for this day
-                    const dateKey = formatDateKey(date);
-                    const explicitLocation = data[dateKey]; // The actual value from Firestore (or undefined)
-                    
-                    // Handle weekend defaults for display
-                    let location = explicitLocation;
-                    if (!location) {
-                        const dayOfWeek = date.getDay();
-                        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                        location = isWeekend ? 'home' : 'none';
-                    }
-                    
-                    currentWeek.push({ location, explicitLocation, date, element: dayElement });
-                }
-            } else {
-                // Empty cell - add placeholder but don't count it
-                currentWeek.push({ location: null, explicitLocation: null, date: null, element: dayElement });
-            }
-            
-            // If this is Sunday column (7th column) or last cell, add summary badge
-            if (isSundayColumn || index === allDays.length - 1) {
-                countAndDisplayWeekSummary(currentWeek, weekStartIndex);
-                currentWeek = [];
-                weekStartIndex = index + 1;
-            }
-        });
-    });
-}
-
-function countAndDisplayWeekSummary(weekDays, startIndex) {
-    // Count office days (including previous and next month's days)
-    let officeDays = 0;
-    let hasExplicitWeekdayData = false; // Check if at least one weekday (Mon-Fri) has explicit data
-    
-    weekDays.forEach(({ location, explicitLocation, date, element }) => {
-        // Count all days in the week, even if they're from previous or next month
-        // Only count if location is not null (skip empty placeholder cells)
-        if (location !== null && element.querySelector('.day-number')) {
-            if (location === 'office') {
-                officeDays++;
-            }
-            
-            // Check if it's a weekday (Mon-Fri) with an explicit location set
-            if (date) {
-                const dayOfWeek = date.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
-                if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday to Friday
-                    // Only count if explicitly set in Firestore (not defaulted)
-                    if (explicitLocation === 'home' || explicitLocation === 'office') {
-                        hasExplicitWeekdayData = true;
-                    }
-                }
-            }
-        }
-    });
-    
-    // Office badge removed from Sunday cells - office count is now shown in Stats column only
-    // Removed code that displayed badge on Sunday cells
 }
 
 // Helper function to check if an activity is running
@@ -795,7 +740,7 @@ function isSkiActivity(activity) {
            activityName.includes('snow shoe');
 }
 
-function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
+function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, locationData = null) {
     if (!currentUser || !db) return;
     
     const calendarGrid = document.getElementById('calendarGrid');
@@ -808,14 +753,17 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth) {
     const nextMonth = month === 11 ? 0 : month + 1;
     const nextYear = month === 11 ? year + 1 : year;
     
-    // Get location data and goals
-    db.collection('users').doc(currentUser).get().then(doc => {
-        const locationData = doc.exists ? doc.data() : {};
-        const userGoals = (doc.exists && doc.data().weeklyGoals) ? doc.data().weeklyGoals : {
+    const locationPromise = locationData ? Promise.resolve(locationData) : getCurrentUserData();
+    locationPromise.then(locationData => {
+        locationData = locationData || {};
+        const userGoals = locationData.weeklyGoals ? locationData.weeklyGoals : {
             office: 3,
             running: 0,
             weights: 0,
-            coldPlunge: 0
+            coldPlunge: 0,
+            yoga: 0,
+            hiking: 0,
+            ski: 0
         };
         
         // Find all stats placeholders and calculate stats for their corresponding weeks
@@ -1106,7 +1054,7 @@ function parseDateKey(dateKey) {
 }
 
 // Calculate and display stats
-function updateStats() {
+async function updateStats() {
     // Always update UI elements, even if no user or data
     const avgElement = document.getElementById('avgWeeklyOffice');
     const beltElement = document.getElementById('beltValue');
@@ -1118,9 +1066,9 @@ function updateStats() {
         return;
     }
     
-    db.collection('users').doc(currentUser).get().then(doc => {
-        const data = doc.exists ? doc.data() : {};
-        
+    const data = currentUserData || await getCurrentUserData();
+
+    try {
         // Group all days into weeks (only explicitly saved data)
         const weeksMap = new Map(); // Map of week key (Monday date string) to week data
         
@@ -1222,23 +1170,12 @@ function updateStats() {
                 ? beltAverage.toFixed(2) 
                 : '-';
         }
-    }).catch(error => {
+    } catch (error) {
         console.error('Error calculating stats:', error);
         // On error, show "-"
         if (avgElement) avgElement.textContent = '-';
         if (beltElement) beltElement.textContent = '-';
-    });
-}
-
-// Real-time updates - listen for changes from other devices
-if (currentUser && db) {
-    db.collection('users').doc(currentUser).onSnapshot(doc => {
-        if (doc.exists) {
-            renderCalendar(); // Refresh calendar when data changes (which also updates stats)
-        } else {
-            updateStats(); // Update stats even if no data exists
-        }
-    });
+    }
 }
 
 // ==================== STRAVA INTEGRATION ====================
