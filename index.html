@@ -51,6 +51,32 @@
             </div>
         </div>
 
+        <div class="status-group">
+            <div class="status-group-label">Year to Date <span id="ytdYear"></span></div>
+            <div id="ytdStatus" class="monthly-status">
+                <div class="monthly-status-item office">
+                    <span class="monthly-status-icon">🏢</span>
+                    <span class="monthly-status-label">Office</span>
+                    <span id="ytdOfficeCount" class="monthly-status-value">0</span>
+                </div>
+                <div class="monthly-status-item home">
+                    <span class="monthly-status-icon">🏠</span>
+                    <span class="monthly-status-label">Home</span>
+                    <span id="ytdHomeCount" class="monthly-status-value">0</span>
+                </div>
+                <div class="monthly-status-item vacation">
+                    <span class="monthly-status-icon">🌴</span>
+                    <span class="monthly-status-label">Vacation</span>
+                    <span id="ytdVacationCount" class="monthly-status-value">0</span>
+                </div>
+                <div class="monthly-status-item unset">
+                    <span class="monthly-status-icon">❔</span>
+                    <span class="monthly-status-label">Unset</span>
+                    <span id="ytdUnsetCount" class="monthly-status-value">0</span>
+                </div>
+            </div>
+        </div>
+
         <div class="filter-controls">
             <button id="workFilter" class="filter-btn active" data-filter="work">
                 <span class="filter-icon">🏢</span>
@@ -67,6 +93,10 @@
             <button id="clearWhatIf" class="filter-btn what-if-clear-btn" style="display:none;">
                 <span class="filter-icon">🧹</span>
                 <span>Clear What-If</span>
+            </button>
+            <button id="hideWeekendsToggle" class="filter-btn" data-filter="weekends">
+                <span class="filter-icon">📅</span>
+                <span id="hideWeekendsLabel">Hide Weekends</span>
             </button>
         </div>
 
@@ -97,14 +127,14 @@
         </div>
 
         <div class="calendar-container">
-            <div class="calendar-header">
+            <div class="calendar-header" id="calendarHeader">
                 <div class="day-header">Mon</div>
                 <div class="day-header">Tue</div>
                 <div class="day-header">Wed</div>
                 <div class="day-header">Thu</div>
                 <div class="day-header">Fri</div>
-                <div class="day-header">Sat</div>
-                <div class="day-header">Sun</div>
+                <div class="day-header weekend-cell">Sat</div>
+                <div class="day-header weekend-cell">Sun</div>
                 <div class="day-header stats-header">Stats</div>
             </div>
             <div id="calendarGrid" class="calendar-grid"></div>

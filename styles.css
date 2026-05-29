@@ -293,6 +293,24 @@ h1 {
     margin-bottom: 20px;
 }
 
+.status-group {
+    margin-bottom: 20px;
+}
+
+.status-group .monthly-status {
+    margin-bottom: 0;
+}
+
+.status-group-label {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #888;
+    margin-bottom: 8px;
+}
+
 .monthly-status-item {
     display: flex;
     align-items: center;
@@ -595,6 +613,16 @@ h1 {
     gap: 8px;
     /* Ensure all direct children are grid items */
     grid-auto-flow: row;
+}
+
+/* Hide weekends mode: drop Sat & Sun and reflow to 6 columns. */
+.calendar-container.hide-weekends .calendar-header,
+.calendar-container.hide-weekends .calendar-grid {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.calendar-container.hide-weekends .weekend-cell {
+    display: none;
 }
 
 .calendar-day {

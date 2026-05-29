@@ -54,6 +54,8 @@ let activeFilters = {
     health: true
 }; // Track which filters are active
 
+let hideWeekends = localStorage.getItem('hideWeekends') === 'true';
+
 // What-If mode: tentative location overrides not persisted to Firebase
 let whatIfMode = false;
 let whatIfData = {}; // dateKey -> 'home' | 'office' | 'nonworkday' | null (clear)
@@ -281,6 +283,10 @@ function initializeApp() {
     document.getElementById('beltOverviewBtn').addEventListener('click', openBeltOverview);
     document.getElementById('beltOverviewClose').addEventListener('click', closeBeltOverview);
 
+    // Hide-weekends toggle
+    document.getElementById('hideWeekendsToggle').addEventListener('click', toggleHideWeekends);
+    applyHideWeekends();
+
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
         const modal = document.getElementById('modal');
@@ -468,6 +474,28 @@ function clearWhatIf() {
     whatIfData = {};
     if (whatIfMode) {
         renderCalendar();
+    }
+}
+
+function toggleHideWeekends() {
+    hideWeekends = !hideWeekends;
+    localStorage.setItem('hideWeekends', hideWeekends ? 'true' : 'false');
+    applyHideWeekends();
+}
+
+function applyHideWeekends() {
+    const container = document.querySelector('.calendar-container');
+    const btn = document.getElementById('hideWeekendsToggle');
+    const label = document.getElementById('hideWeekendsLabel');
+    if (!container) return;
+    if (hideWeekends) {
+        container.classList.add('hide-weekends');
+        if (btn) btn.classList.add('active');
+        if (label) label.textContent = 'Show Weekends';
+    } else {
+        container.classList.remove('hide-weekends');
+        if (btn) btn.classList.remove('active');
+        if (label) label.textContent = 'Hide Weekends';
     }
 }
 
@@ -718,6 +746,7 @@ async function renderCalendar() {
     // Update stats
     updateStats();
     updateMonthlyStatus(year, month, userData);
+    updateYearToDateStatus(userData);
 }
 
 // Counts of weekday placements for the visible month (excludes Sat/Sun).
@@ -753,11 +782,51 @@ function updateMonthlyStatus(year, month, effectiveData) {
     unsetEl.textContent = unset;
 }
 
+// Year-to-date counts: Jan 1 of current calendar year through today, weekdays only.
+// Uses the effective data view so what-if scenarios are reflected.
+function updateYearToDateStatus(effectiveData) {
+    const officeEl = document.getElementById('ytdOfficeCount');
+    const homeEl = document.getElementById('ytdHomeCount');
+    const vacationEl = document.getElementById('ytdVacationCount');
+    const unsetEl = document.getElementById('ytdUnsetCount');
+    const yearLabel = document.getElementById('ytdYear');
+    if (!officeEl) return;
+
+    const data = effectiveData || {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const year = today.getFullYear();
+    if (yearLabel) yearLabel.textContent = year;
+
+    const jan1 = new Date(year, 0, 1);
+    let office = 0, home = 0, vacation = 0, unset = 0;
+
+    for (let d = new Date(jan1); d <= today; d.setDate(d.getDate() + 1)) {
+        const dow = d.getDay();
+        if (dow === 0 || dow === 6) continue;
+        const key = formatDateKey(d);
+        const loc = data[key];
+        if (loc === 'office') office++;
+        else if (loc === 'home') home++;
+        else if (loc === 'nonworkday') vacation++;
+        else unset++;
+    }
+
+    officeEl.textContent = office;
+    homeEl.textContent = home;
+    vacationEl.textContent = vacation;
+    unsetEl.textContent = unset;
+}
+
 function createDayElement(day, year, month) {
     const dayDiv = document.createElement('div');
     dayDiv.className = 'calendar-day';
     
     if (day !== null) {
+        const dow = new Date(year, month, day).getDay();
+        if (dow === 0 || dow === 6) {
+            dayDiv.classList.add('weekend-cell');
+        }
         dayDiv.innerHTML = `
             <div class="day-number">${day}</div>
             <div class="location-indicator" data-location="none"></div>
