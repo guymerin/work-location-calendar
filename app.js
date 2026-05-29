@@ -355,13 +355,78 @@ function initializeModalListeners() {
     });
 }
 
-function setUserName() {
+// Hash a (username, password) pair with SHA-256 using a fixed app salt + the
+// normalized username as an additional per-user salt. Returns hex string.
+async function hashPassword(name, password) {
+    const salt = 'wlc::v1::' + name.trim().toLowerCase();
+    const encoder = new TextEncoder();
+    const data = encoder.encode(salt + '::' + password);
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buf))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+async function setUserName() {
     const userNameInput = document.getElementById('userName');
     const name = userNameInput.value.trim();
-    
+
     if (!name) {
         alert('Please enter your name');
         return;
+    }
+
+    if (!db) {
+        alert('Database not initialized — cannot verify password.');
+        return;
+    }
+
+    // Look up the user's doc to decide between verify and first-time setup.
+    let docSnap;
+    try {
+        docSnap = await db.collection('users').doc(name).get();
+    } catch (err) {
+        console.error('Error reading user doc:', err);
+        alert('Could not reach the database. Please try again.');
+        return;
+    }
+
+    const existingHash = docSnap.exists ? docSnap.data().passwordHash : null;
+
+    if (existingHash) {
+        // Existing protected user → verify
+        const entered = window.prompt(`Enter password for "${name}":`);
+        if (entered === null) return; // cancelled
+        const enteredHash = await hashPassword(name, entered);
+        if (enteredHash !== existingHash) {
+            alert('Incorrect password.');
+            return;
+        }
+    } else {
+        // First-time setup (or pre-existing user without a password) → create one.
+        const msg = docSnap.exists
+            ? `User "${name}" doesn't have a password yet. Set one now:`
+            : `Create a password for new user "${name}":`;
+        const newPwd = window.prompt(msg);
+        if (newPwd === null) return; // cancelled
+        if (!newPwd || newPwd.length < 4) {
+            alert('Password must be at least 4 characters.');
+            return;
+        }
+        const confirmPwd = window.prompt('Confirm password:');
+        if (confirmPwd === null) return;
+        if (confirmPwd !== newPwd) {
+            alert('Passwords do not match.');
+            return;
+        }
+        const newHash = await hashPassword(name, newPwd);
+        try {
+            await db.collection('users').doc(name).set({ passwordHash: newHash }, { merge: true });
+        } catch (err) {
+            console.error('Error saving password:', err);
+            alert('Could not save password. Please try again.');
+            return;
+        }
     }
 
     currentUser = name;
@@ -373,7 +438,7 @@ function setUserName() {
     // Check Strava and Garmin connection status after setting user
     checkStravaConnection();
     checkGarminConnection();
-    
+
     renderCalendar(); // This will also update stats
     updateStats(); // Also update stats directly
 }
