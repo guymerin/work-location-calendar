@@ -54,6 +54,37 @@ let activeFilters = {
     health: true
 }; // Track which filters are active
 
+// What-If mode: tentative location overrides not persisted to Firebase
+let whatIfMode = false;
+let whatIfData = {}; // dateKey -> 'home' | 'office' | 'nonworkday' | null (clear)
+let whatIfWindowEnd = null; // Date (Monday of the chosen end week) or null for auto
+
+// Returns true if the given Date is today or in the future (date-only comparison)
+function isFutureOrToday(date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() >= today.getTime();
+}
+
+// Returns a merged data view (real user data + what-if overlay) for rendering & stats.
+// If whatIfData[key] === null, treat as a "clear" override (overrides any real value).
+function getEffectiveData(baseData) {
+    const base = baseData || currentUserData || {};
+    if (!whatIfMode) return base;
+    const merged = Object.assign({}, base);
+    Object.keys(whatIfData).forEach(key => {
+        const v = whatIfData[key];
+        if (v === null) {
+            delete merged[key];
+        } else {
+            merged[key] = v;
+        }
+    });
+    return merged;
+}
+
 function clearCurrentUserData() {
     currentUserData = null;
     currentUserDataPromise = null;
@@ -242,11 +273,23 @@ function initializeApp() {
     document.getElementById('workFilter').addEventListener('click', () => toggleFilter('work'));
     document.getElementById('healthFilter').addEventListener('click', () => toggleFilter('health'));
 
+    // What-If mode listeners
+    document.getElementById('whatIfToggle').addEventListener('click', toggleWhatIfMode);
+    document.getElementById('clearWhatIf').addEventListener('click', clearWhatIf);
+
+    // BELT overview modal
+    document.getElementById('beltOverviewBtn').addEventListener('click', openBeltOverview);
+    document.getElementById('beltOverviewClose').addEventListener('click', closeBeltOverview);
+
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
         const modal = document.getElementById('modal');
         if (e.target === modal) {
             closeModal();
+        }
+        const beltModal = document.getElementById('beltOverviewModal');
+        if (e.target === beltModal) {
+            closeBeltOverview();
         }
     });
 
@@ -359,10 +402,144 @@ function toggleFilter(filterType) {
     renderCalendar();
 }
 
+function toggleWhatIfMode() {
+    whatIfMode = !whatIfMode;
+    const toggleBtn = document.getElementById('whatIfToggle');
+    const clearBtn = document.getElementById('clearWhatIf');
+    const banner = document.getElementById('whatIfBanner');
+    const beltCard = document.getElementById('beltCard');
+    const beltLabel = document.getElementById('beltLabel');
+    const windowInput = document.getElementById('whatIfWindowEnd');
+
+    if (whatIfMode) {
+        toggleBtn.classList.add('active');
+        clearBtn.style.display = '';
+        banner.style.display = '';
+        beltCard.classList.add('what-if-active');
+        beltLabel.textContent = 'BELT (What-If)';
+
+        // Default window end = current week's Monday on first activation
+        if (!whatIfWindowEnd) {
+            whatIfWindowEnd = getMondayOfWeek(new Date());
+        }
+        if (windowInput && !windowInput.dataset.bound) {
+            windowInput.addEventListener('change', onWhatIfWindowChange);
+            windowInput.dataset.bound = 'true';
+        }
+        if (windowInput) {
+            windowInput.value = formatDateKey(whatIfWindowEnd);
+        }
+        updateWhatIfWindowRangeDisplay();
+    } else {
+        toggleBtn.classList.remove('active');
+        clearBtn.style.display = 'none';
+        banner.style.display = 'none';
+        beltCard.classList.remove('what-if-active');
+        beltLabel.textContent = 'BELT';
+    }
+    renderCalendar();
+}
+
+function onWhatIfWindowChange(e) {
+    const value = e.target.value;
+    if (!value) return;
+    const picked = parseDateKey(value);
+    if (isNaN(picked.getTime())) return;
+    whatIfWindowEnd = getMondayOfWeek(picked);
+    // Normalize the input back to the Monday of the picked week
+    e.target.value = formatDateKey(whatIfWindowEnd);
+    updateWhatIfWindowRangeDisplay();
+    renderCalendar();
+}
+
+function updateWhatIfWindowRangeDisplay() {
+    const rangeEl = document.getElementById('whatIfWindowRange');
+    if (!rangeEl || !whatIfWindowEnd) return;
+    const end = new Date(whatIfWindowEnd);
+    const endSunday = new Date(end);
+    endSunday.setDate(endSunday.getDate() + 6);
+    const start = new Date(end);
+    start.setDate(start.getDate() - 11 * 7);
+    const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    rangeEl.textContent = `(window: ${fmt(start)} → ${fmt(endSunday)})`;
+}
+
+function clearWhatIf() {
+    whatIfData = {};
+    if (whatIfMode) {
+        renderCalendar();
+    }
+}
+
+async function openBeltOverview() {
+    const modal = document.getElementById('beltOverviewModal');
+    const title = document.getElementById('beltOverviewTitle');
+    const summary = document.getElementById('beltOverviewSummary');
+    const body = document.getElementById('beltOverviewBody');
+    if (!modal) return;
+
+    body.innerHTML = '';
+    summary.innerHTML = 'Loading…';
+    title.textContent = whatIfMode ? 'BELT Overview (What-If)' : 'BELT Overview';
+    modal.style.display = 'block';
+
+    if (!currentUser || !db) {
+        summary.innerHTML = 'Set your name to see your BELT breakdown.';
+        return;
+    }
+
+    const rawData = currentUserData || await getCurrentUserData();
+    const stats = whatIfMode
+        ? computeWorkStats(getEffectiveData(rawData || {}), true, whatIfWindowEnd)
+        : computeWorkStats(rawData || {});
+
+    const fmtDate = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const windowEndSunday = new Date(stats.windowEnd);
+    windowEndSunday.setDate(windowEndSunday.getDate() + 6);
+
+    const beltText = whatIfMode
+        ? stats.beltAverage.toFixed(2)
+        : (stats.best8WeeksCount > 0 ? stats.beltAverage.toFixed(2) : '-');
+    summary.innerHTML = `
+        <div><strong>Window:</strong> ${fmtDate(stats.windowStart)} → ${fmtDate(windowEndSunday)}</div>
+        <div><strong>BELT:</strong> ${beltText}
+            (best ${stats.best8WeeksCount} of ${stats.last12Weeks.length} weeks)</div>
+        ${whatIfMode ? '<div><em>Highlighted rows are the weeks counted in BELT.</em></div>' : ''}
+    `;
+
+    const fmtShort = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    body.innerHTML = stats.last12Weeks
+        .map((w, i) => {
+            const weekStart = w.weekStart;
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            const rowClass = !w.hasData ? 'no-data' : (w.inBest8 ? 'in-best8' : '');
+            const officeDisplay = w.hasData ? w.officeDays : '—';
+            const badge = w.inBest8
+                ? '<span class="badge yes">✓ counted</span>'
+                : '<span class="badge no">—</span>';
+            return `
+                <tr class="${rowClass}">
+                    <td>${i + 1}</td>
+                    <td>${fmtShort(weekStart)} – ${fmtShort(weekEnd)}</td>
+                    <td>${officeDisplay}</td>
+                    <td>${badge}</td>
+                </tr>
+            `;
+        })
+        .join('');
+}
+
+function closeBeltOverview() {
+    const modal = document.getElementById('beltOverviewModal');
+    if (modal) modal.style.display = 'none';
+}
+
 async function renderCalendar() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    const userData = currentUser ? await getCurrentUserData() : null;
+    const rawUserData = currentUser ? await getCurrentUserData() : null;
+    const userData = getEffectiveData(rawUserData);
     
     // Update month/year display
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -559,6 +736,10 @@ function createDayElement(day, year, month) {
             }
             
             const date = new Date(year, month, day);
+            if (whatIfMode && !isFutureOrToday(date)) {
+                alert('What-If mode only lets you set today or future days.');
+                return;
+            }
             selectedDate = date;
             openModal(selectedDate);
         });
@@ -611,8 +792,21 @@ function saveLocation(date, location) {
     }
 
     const dateStr = formatDateKey(date);
-    const userDocRef = db.collection('users').doc(currentUser);
     const value = location === 'none' ? null : location;
+
+    // What-If mode: store override in-memory only, never persist to Firebase
+    if (whatIfMode) {
+        if (!isFutureOrToday(date)) {
+            alert('What-If mode only lets you set today or future days.');
+            return;
+        }
+        whatIfData[dateStr] = value;
+        closeModal();
+        renderCalendar();
+        return;
+    }
+
+    const userDocRef = db.collection('users').doc(currentUser);
     const update = { [dateStr]: value };
 
     userDocRef.set(update, { merge: true })
@@ -638,12 +832,20 @@ function loadDayLocation(year, month, day, dayElement, userData = null) {
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
 
     const updateElement = (data = {}) => {
-        const location = data[dateStr] || (isWeekend ? 'nonworkday' : 'none');
+        const effective = getEffectiveData(data);
+        const location = effective[dateStr] || (isWeekend ? 'nonworkday' : 'none');
         updateDayElement(dayElement, location);
+        if (whatIfMode && Object.prototype.hasOwnProperty.call(whatIfData, dateStr)) {
+            dayElement.classList.add('what-if-day');
+        } else {
+            dayElement.classList.remove('what-if-day');
+        }
     };
 
     if (userData) {
-        updateElement(userData);
+        // userData passed in may already be the effective view from renderCalendar — re-derive
+        // from raw cache to keep what-if overlay consistent.
+        updateElement(currentUserData || userData);
         return;
     }
 
@@ -658,10 +860,14 @@ function loadLocationForDate(date) {
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
 
     if (currentUserData) {
-        return Promise.resolve(currentUserData[dateStr] || (isWeekend ? 'nonworkday' : 'none'));
+        const eff = getEffectiveData(currentUserData);
+        return Promise.resolve(eff[dateStr] || (isWeekend ? 'nonworkday' : 'none'));
     }
 
-    return getCurrentUserData().then(data => data[dateStr] || (isWeekend ? 'nonworkday' : 'none'));
+    return getCurrentUserData().then(data => {
+        const eff = getEffectiveData(data);
+        return eff[dateStr] || (isWeekend ? 'nonworkday' : 'none');
+    });
 }
 
 function updateDayElement(dayElement, location) {
@@ -762,7 +968,7 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
     const nextMonth = month === 11 ? 0 : month + 1;
     const nextYear = month === 11 ? year + 1 : year;
     
-    const locationPromise = locationData ? Promise.resolve(locationData) : getCurrentUserData();
+    const locationPromise = locationData ? Promise.resolve(locationData) : getCurrentUserData().then(d => getEffectiveData(d));
     locationPromise.then(locationData => {
         locationData = locationData || {};
         const userGoals = locationData.weeklyGoals ? locationData.weeklyGoals : {
@@ -1062,128 +1268,176 @@ function parseDateKey(dateKey) {
     return new Date(year, month - 1, day);
 }
 
+// Compute the average-weekly-office-days and BELT (best 8 of last 12 weeks)
+// given an arbitrary user-data dictionary keyed by YYYY-MM-DD.
+// When `includeFuture` is true (what-if mode), the 12-week window slides forward
+// to end at the latest week that has data, and the "current week needs Friday data"
+// exclusion is dropped so projected weeks count.
+// `customWindowEnd` (a Date, ideally a Monday) explicitly pins the end of the 12-week
+// BELT window and overrides the auto-derived endpoint.
+function computeWorkStats(data, includeFuture = false, customWindowEnd = null) {
+    const weeksMap = new Map();
+
+    Object.keys(data).forEach(dateKey => {
+        if (!data[dateKey]) return;
+        const date = parseDateKey(dateKey);
+        if (isNaN(date.getTime())) return;
+
+        const monday = getMondayOfWeek(date);
+        const weekKey = formatDateKey(monday);
+
+        if (!weeksMap.has(weekKey)) {
+            weeksMap.set(weekKey, { weekStart: monday, days: new Map() });
+        }
+        weeksMap.get(weekKey).days.set(dateKey, data[dateKey]);
+    });
+
+    const weeks = Array.from(weeksMap.values()).map(week => {
+        let officeDays = 0;
+        let hasData = false;
+        week.days.forEach(location => {
+            if (location === 'home' || location === 'office' || location === 'nonworkday') {
+                hasData = true;
+            }
+            if (location === 'office') officeDays++;
+        });
+        return { weekStart: week.weekStart, officeDays, hasData };
+    });
+
+    const today = new Date();
+    const currentWeekMonday = getMondayOfWeek(today);
+    const currentWeekFriday = new Date(currentWeekMonday);
+    currentWeekFriday.setDate(currentWeekFriday.getDate() + 4);
+    const currentWeekFridayKey = formatDateKey(currentWeekFriday);
+    const hasCurrentWeekFridayData = !!data[currentWeekFridayKey];
+
+    // Average weekly office days
+    const weeksWithData = weeks.filter(w => {
+        if (!w.hasData) return false;
+        if (includeFuture) return true; // projected weeks count as-is
+        // Actual mode: exclude current week unless Friday is filled, and exclude future weeks
+        if (w.weekStart.getTime() > currentWeekMonday.getTime()) return false;
+        if (w.weekStart.getTime() === currentWeekMonday.getTime()) {
+            return hasCurrentWeekFridayData;
+        }
+        return true;
+    });
+
+    let avgWeeklyOffice = 0;
+    if (weeksWithData.length > 0) {
+        const totalOfficeDays = weeksWithData.reduce((sum, w) => sum + w.officeDays, 0);
+        avgWeeklyOffice = totalOfficeDays / weeksWithData.length;
+    }
+
+    // BELT window: last 12 weeks ending at currentWeekMonday (actual) or at the
+    // latest week with data (what-if, so future scenarios count).
+    let windowEnd = currentWeekMonday;
+    if (customWindowEnd) {
+        windowEnd = getMondayOfWeek(customWindowEnd);
+    } else if (includeFuture) {
+        const latestWeekWithData = weeks
+            .filter(w => w.hasData)
+            .reduce((latest, w) => (!latest || w.weekStart > latest ? w.weekStart : latest), null);
+        if (latestWeekWithData && latestWeekWithData > currentWeekMonday) {
+            windowEnd = latestWeekWithData;
+        }
+    }
+
+    const twelveWeeksAgo = new Date(windowEnd);
+    twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 11 * 7);
+
+    // Build a full 12-slot list of weeks (including weeks with no data) so the
+    // breakdown view can show every week in the window, not just the ones that
+    // appear in the data map.
+    const last12Weeks = [];
+    const existingByKey = new Map(weeks.map(w => [formatDateKey(w.weekStart), w]));
+    for (let i = 0; i < 12; i++) {
+        const weekStart = new Date(twelveWeeksAgo);
+        weekStart.setDate(weekStart.getDate() + i * 7);
+        const key = formatDateKey(weekStart);
+        const existing = existingByKey.get(key);
+        last12Weeks.push(existing || { weekStart, officeDays: 0, hasData: false });
+    }
+
+    const best8Weeks = last12Weeks
+        .filter(w => w.hasData)
+        .sort((a, b) => b.officeDays - a.officeDays)
+        .slice(0, 8);
+    const best8Set = new Set(best8Weeks.map(w => formatDateKey(w.weekStart)));
+    const annotated12Weeks = last12Weeks.map(w => Object.assign({}, w, {
+        inBest8: best8Set.has(formatDateKey(w.weekStart))
+    }));
+
+    let beltAverage = 0;
+    if (best8Weeks.length > 0) {
+        const totalOfficeDays = best8Weeks.reduce((sum, w) => sum + w.officeDays, 0);
+        beltAverage = totalOfficeDays / 8;
+    }
+
+    return {
+        avgWeeklyOffice,
+        weeksWithDataCount: weeksWithData.length,
+        beltAverage,
+        best8WeeksCount: best8Weeks.length,
+        windowStart: twelveWeeksAgo,
+        windowEnd,
+        last12Weeks: annotated12Weeks
+    };
+}
+
 // Calculate and display stats
 async function updateStats() {
-    // Always update UI elements, even if no user or data
     const avgElement = document.getElementById('avgWeeklyOffice');
     const beltElement = document.getElementById('beltValue');
-    
-    // Default to "-" if no user or db
+    const beltActualSub = document.getElementById('beltActualSub');
+
     if (!currentUser || !db) {
         if (avgElement) avgElement.textContent = '-';
         if (beltElement) beltElement.textContent = '-';
+        if (beltActualSub) beltActualSub.style.display = 'none';
         return;
     }
-    
-    const data = currentUserData || await getCurrentUserData();
+
+    const rawData = currentUserData || await getCurrentUserData();
 
     try {
-        // Group all days into weeks (only explicitly saved data)
-        const weeksMap = new Map(); // Map of week key (Monday date string) to week data
-        
-        // Process all dates in the data
-        Object.keys(data).forEach(dateKey => {
-            // Skip null values (cleared locations)
-            if (!data[dateKey]) return;
-            
-            const date = parseDateKey(dateKey);
-            if (isNaN(date.getTime())) return; // Invalid date
-            
-            const monday = getMondayOfWeek(date);
-            const weekKey = formatDateKey(monday);
-            
-            if (!weeksMap.has(weekKey)) {
-                weeksMap.set(weekKey, {
-                    weekStart: monday,
-                    days: new Map() // Map of date key to location
-                });
-            }
-            
-            weeksMap.get(weekKey).days.set(dateKey, data[dateKey]);
-        });
-        
-        // Convert weeks map to array and calculate office days per week
-        const weeks = Array.from(weeksMap.values()).map(week => {
-            let officeDays = 0;
-            let hasData = false; // Track if week has any home or office days
-            
-            week.days.forEach(location => {
-                if (location === 'home' || location === 'office' || location === 'nonworkday') {
-                    hasData = true;
-                }
-                if (location === 'office') {
-                    officeDays++;
-                }
-            });
-            
-            return {
-                weekStart: week.weekStart,
-                officeDays: officeDays,
-                hasData: hasData
-            };
-        });
-        
-        // Calculate average weekly office days (only weeks with data)
-        // Exclude current week if it doesn't have data through Friday
-        const today = new Date();
-        const currentWeekMonday = getMondayOfWeek(today);
-        const currentWeekFriday = new Date(currentWeekMonday);
-        currentWeekFriday.setDate(currentWeekFriday.getDate() + 4); // Friday is 4 days after Monday
-        const currentWeekFridayKey = formatDateKey(currentWeekFriday);
-        const hasCurrentWeekFridayData = !!data[currentWeekFridayKey];
-        
-        const weeksWithData = weeks.filter(w => {
-            // Exclude current week if it doesn't have Friday data
-            if (w.weekStart.getTime() === currentWeekMonday.getTime()) {
-                return hasCurrentWeekFridayData && w.hasData;
-            }
-            return w.hasData;
-        });
-        
-        let avgWeeklyOffice = 0;
-        if (weeksWithData.length > 0) {
-            const totalOfficeDays = weeksWithData.reduce((sum, w) => sum + w.officeDays, 0);
-            avgWeeklyOffice = totalOfficeDays / weeksWithData.length;
-        }
-        
-        // Calculate BELT: Best 8 weeks from last 12 weeks
-        const todayMonday = getMondayOfWeek(today);
-        const twelveWeeksAgo = new Date(todayMonday);
-        twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 11 * 7); // 11 weeks back (12 weeks total)
-        
-        const last12Weeks = weeks.filter(w => {
-            return w.weekStart >= twelveWeeksAgo && w.weekStart <= todayMonday;
-        });
-        
-        // Sort by office days (descending) and take best 8
-        const best8Weeks = last12Weeks
-            .filter(w => w.hasData)
-            .sort((a, b) => b.officeDays - a.officeDays)
-            .slice(0, 8);
-        
-        let beltAverage = 0;
-        if (best8Weeks.length > 0) {
-            const totalOfficeDays = best8Weeks.reduce((sum, w) => sum + w.officeDays, 0);
-            beltAverage = totalOfficeDays / best8Weeks.length;
-        }
-        
-        // Update UI
+        const actual = computeWorkStats(rawData || {});
+        const displayed = whatIfMode
+            ? computeWorkStats(getEffectiveData(rawData || {}), true, whatIfWindowEnd)
+            : actual;
+
         if (avgElement) {
-            avgElement.textContent = weeksWithData.length > 0 
-                ? avgWeeklyOffice.toFixed(2) 
+            avgElement.textContent = displayed.weeksWithDataCount > 0
+                ? displayed.avgWeeklyOffice.toFixed(2)
                 : '-';
         }
-        
+
         if (beltElement) {
-            beltElement.textContent = best8Weeks.length > 0 
-                ? beltAverage.toFixed(2) 
-                : '-';
+            if (whatIfMode) {
+                // In what-if mode, always show a numeric BELT (divided by 8) so the
+                // user can see how far they are from the policy even with sparse data.
+                beltElement.textContent = displayed.beltAverage.toFixed(2);
+            } else {
+                beltElement.textContent = displayed.best8WeeksCount > 0
+                    ? displayed.beltAverage.toFixed(2)
+                    : '-';
+            }
+        }
+
+        if (beltActualSub) {
+            if (whatIfMode) {
+                const actualText = actual.best8WeeksCount > 0 ? actual.beltAverage.toFixed(2) : '-';
+                beltActualSub.textContent = `Actual BELT: ${actualText}`;
+                beltActualSub.style.display = '';
+            } else {
+                beltActualSub.style.display = 'none';
+            }
         }
     } catch (error) {
         console.error('Error calculating stats:', error);
-        // On error, show "-"
         if (avgElement) avgElement.textContent = '-';
         if (beltElement) beltElement.textContent = '-';
+        if (beltActualSub) beltActualSub.style.display = 'none';
     }
 }
 

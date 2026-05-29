@@ -304,6 +304,185 @@ h1 {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
 }
 
+.stat-card.belt-card.what-if-active {
+    background: linear-gradient(135deg, #7b4397 0%, #4a00e0 100%);
+    box-shadow: 0 4px 16px rgba(74, 0, 224, 0.35);
+}
+
+.belt-actual-sub {
+    margin-top: 6px;
+    opacity: 0.9;
+    font-style: normal;
+    font-weight: 600;
+}
+
+.belt-overview-btn {
+    margin-top: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.15s ease;
+}
+
+.belt-overview-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.belt-overview-content {
+    max-width: 560px;
+}
+
+.belt-overview-summary {
+    background: #f7f5fb;
+    border: 1px solid #e0d6f0;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 10px 0 18px;
+    font-size: 0.95rem;
+    color: #4a00e0;
+    line-height: 1.55;
+}
+
+.belt-overview-summary strong {
+    color: #2e0a85;
+}
+
+.belt-overview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+
+.belt-overview-table th,
+.belt-overview-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.belt-overview-table th {
+    background: #fafafa;
+    font-weight: 600;
+    color: #555;
+}
+
+.belt-overview-table tr.in-best8 {
+    background: #ede7f6;
+}
+
+.belt-overview-table tr.in-best8 td {
+    font-weight: 600;
+    color: #4a00e0;
+}
+
+.belt-overview-table tr.no-data td {
+    color: #aaa;
+    font-style: italic;
+}
+
+.belt-overview-table .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.belt-overview-table .badge.yes {
+    background: #4a00e0;
+    color: white;
+}
+
+.belt-overview-table .badge.no {
+    background: #eee;
+    color: #888;
+}
+
+.what-if-btn {
+    border-color: #b39ddb !important;
+}
+
+.what-if-btn.active {
+    background: linear-gradient(135deg, #7b4397 0%, #4a00e0 100%) !important;
+    color: white !important;
+    border-color: #4a00e0 !important;
+}
+
+.what-if-clear-btn {
+    border-color: #e0e0e0 !important;
+}
+
+.what-if-banner {
+    background: linear-gradient(135deg, #ede7f6 0%, #e3f2fd 100%);
+    border: 1px dashed #7b4397;
+    color: #4a00e0;
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    font-size: 0.9rem;
+}
+
+.what-if-banner-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.what-if-window-row {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed rgba(123, 67, 151, 0.4);
+}
+
+.what-if-window-row label {
+    font-weight: 600;
+}
+
+.what-if-window-row input[type="date"] {
+    padding: 4px 8px;
+    border: 1px solid #b39ddb;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    color: #4a00e0;
+    background: white;
+}
+
+.what-if-window-range {
+    font-style: italic;
+    opacity: 0.85;
+}
+
+.calendar-day.what-if-day {
+    outline: 2px dashed #7b4397;
+    outline-offset: -3px;
+    position: relative;
+}
+
+.calendar-day.what-if-day::after {
+    content: '?';
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #4a00e0;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    pointer-events: none;
+}
+
 .stat-label {
     font-size: 0.9rem;
     font-weight: 600;

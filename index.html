@@ -37,6 +37,25 @@
                 <span class="filter-icon">💪</span>
                 <span>Health Stats</span>
             </button>
+            <button id="whatIfToggle" class="filter-btn what-if-btn" data-filter="whatif">
+                <span class="filter-icon">🔮</span>
+                <span>What-If Mode</span>
+            </button>
+            <button id="clearWhatIf" class="filter-btn what-if-clear-btn" style="display:none;">
+                <span class="filter-icon">🧹</span>
+                <span>Clear What-If</span>
+            </button>
+        </div>
+
+        <div id="whatIfBanner" class="what-if-banner" style="display:none;">
+            <div class="what-if-banner-row">
+                <span>🔮 <strong>What-If Mode</strong> — click any future day to try out a scenario. Changes aren't saved and only affect BELT here.</span>
+            </div>
+            <div class="what-if-banner-row what-if-window-row">
+                <label for="whatIfWindowEnd">12-week window ends week of:</label>
+                <input type="date" id="whatIfWindowEnd">
+                <span id="whatIfWindowRange" class="what-if-window-range"></span>
+            </div>
         </div>
 
         <div id="statsSection" class="stats-section">
@@ -45,10 +64,12 @@
                 <div id="avgWeeklyOffice" class="stat-value">-</div>
                 <div class="stat-description">Only counting weeks with data</div>
             </div>
-            <div class="stat-card belt-card">
-                <div class="stat-label">BELT</div>
+            <div class="stat-card belt-card" id="beltCard">
+                <div class="stat-label" id="beltLabel">BELT</div>
                 <div id="beltValue" class="stat-value">-</div>
-                <div class="stat-description">Best 8 weeks from last 12 weeks</div>
+                <div class="stat-description" id="beltDescription">Best 8 weeks from last 12 weeks</div>
+                <div id="beltActualSub" class="stat-description belt-actual-sub" style="display:none;"></div>
+                <button id="beltOverviewBtn" class="belt-overview-btn" type="button">📊 BELT Overview</button>
             </div>
         </div>
 
@@ -358,6 +379,25 @@ else:
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="beltOverviewModal" class="modal">
+        <div class="modal-content belt-overview-content">
+            <span class="close" id="beltOverviewClose">&times;</span>
+            <h3 id="beltOverviewTitle">BELT Overview</h3>
+            <div id="beltOverviewSummary" class="belt-overview-summary"></div>
+            <table class="belt-overview-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Week of</th>
+                        <th>Office Days</th>
+                        <th>In BELT</th>
+                    </tr>
+                </thead>
+                <tbody id="beltOverviewBody"></tbody>
+            </table>
         </div>
     </div>
 
