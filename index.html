@@ -28,6 +28,29 @@
             <button id="nextMonth" class="nav-btn">Next →</button>
         </div>
 
+        <div id="monthlyStatus" class="monthly-status">
+            <div class="monthly-status-item office">
+                <span class="monthly-status-icon">🏢</span>
+                <span class="monthly-status-label">Office</span>
+                <span id="monthOfficeCount" class="monthly-status-value">0</span>
+            </div>
+            <div class="monthly-status-item home">
+                <span class="monthly-status-icon">🏠</span>
+                <span class="monthly-status-label">Home</span>
+                <span id="monthHomeCount" class="monthly-status-value">0</span>
+            </div>
+            <div class="monthly-status-item vacation">
+                <span class="monthly-status-icon">🌴</span>
+                <span class="monthly-status-label">Vacation</span>
+                <span id="monthVacationCount" class="monthly-status-value">0</span>
+            </div>
+            <div class="monthly-status-item unset">
+                <span class="monthly-status-icon">❔</span>
+                <span class="monthly-status-label">Unset</span>
+                <span id="monthUnsetCount" class="monthly-status-value">0</span>
+            </div>
+        </div>
+
         <div class="filter-controls">
             <button id="workFilter" class="filter-btn active" data-filter="work">
                 <span class="filter-icon">🏢</span>

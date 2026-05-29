@@ -717,6 +717,40 @@ async function renderCalendar() {
     
     // Update stats
     updateStats();
+    updateMonthlyStatus(year, month, userData);
+}
+
+// Counts of weekday placements for the visible month (excludes Sat/Sun).
+// Uses the effective data view so what-if scenarios are reflected.
+function updateMonthlyStatus(year, month, effectiveData) {
+    const officeEl = document.getElementById('monthOfficeCount');
+    const homeEl = document.getElementById('monthHomeCount');
+    const vacationEl = document.getElementById('monthVacationCount');
+    const unsetEl = document.getElementById('monthUnsetCount');
+    if (!officeEl) return;
+
+    const data = effectiveData || {};
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let office = 0, home = 0, vacation = 0, unset = 0;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(year, month, d);
+        const dow = date.getDay();
+        if (dow === 0 || dow === 6) continue; // skip weekends
+        const key = formatDateKey(date);
+        const loc = data[key];
+        if (loc === 'office') office++;
+        else if (loc === 'home') home++;
+        else if (loc === 'nonworkday') vacation++;
+        else if (date <= today) unset++; // only count unset for past / today
+    }
+
+    officeEl.textContent = office;
+    homeEl.textContent = home;
+    vacationEl.textContent = vacation;
+    unsetEl.textContent = unset;
 }
 
 function createDayElement(day, year, month) {

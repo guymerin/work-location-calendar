@@ -285,6 +285,65 @@ h1 {
     margin-bottom: 10px;
 }
 
+.monthly-status {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.monthly-status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: #f5f5f7;
+    border: 1px solid #e0e0e0;
+    font-size: 0.95rem;
+    color: #333;
+}
+
+.monthly-status-item.office {
+    background: #e8f0ff;
+    border-color: #b6cff5;
+    color: #1762c0;
+}
+
+.monthly-status-item.home {
+    background: #e9f7ee;
+    border-color: #bce0c8;
+    color: #2e7d4a;
+}
+
+.monthly-status-item.vacation {
+    background: #fff4d9;
+    border-color: #f3d99a;
+    color: #a06a00;
+}
+
+.monthly-status-item.unset {
+    background: #f5f5f7;
+    border-color: #e0e0e0;
+    color: #777;
+}
+
+.monthly-status-icon {
+    font-size: 1.1rem;
+}
+
+.monthly-status-label {
+    font-weight: 600;
+}
+
+.monthly-status-value {
+    font-weight: 700;
+    font-size: 1.1rem;
+    min-width: 1.5em;
+    text-align: right;
+}
+
 .stats-section {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
