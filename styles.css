@@ -52,6 +52,7 @@ h1 {
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 #userName {
@@ -1122,8 +1123,14 @@ h1 {
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    body {
+        overflow-x: hidden;
+    }
+
     .container {
-        padding: 20px;
+        padding: 15px;
+        border-radius: 12px;
+        max-width: 100%;
     }
 
     h1 {
@@ -1132,7 +1139,26 @@ h1 {
 
     header {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .user-section {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    #userName {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    #setUserName {
+        flex: 1 1 auto;
+    }
+
+    .settings-btn {
+        flex: 0 0 auto;
     }
 
     .calendar-controls {
@@ -1164,6 +1190,48 @@ h1 {
         width: 100%;
     }
 
+    .monthly-status {
+        gap: 6px;
+    }
+
+    .monthly-status-item {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+        gap: 6px;
+        flex: 1 1 calc(50% - 6px);
+        justify-content: center;
+    }
+
+    .filter-controls {
+        gap: 8px;
+    }
+
+    .filter-btn {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+        flex: 1 1 calc(50% - 8px);
+        justify-content: center;
+        min-height: 44px;
+    }
+
+    /* Keep the 7-day + stats column layout but allow horizontal swipe
+       instead of squeezing each cell into an unreadable 40px column. */
+    .calendar-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+    }
+
+    .calendar-header,
+    .calendar-grid {
+        min-width: 640px;
+    }
+
+    .calendar-container.hide-weekends .calendar-header,
+    .calendar-container.hide-weekends .calendar-grid {
+        min-width: 480px;
+    }
+
     .calendar-day {
         padding: 6px;
     }
@@ -1179,6 +1247,13 @@ h1 {
     .legend {
         gap: 15px;
     }
+
+    .modal-content {
+        width: 95%;
+        margin: 10% auto;
+        padding: 20px;
+        max-width: none;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1187,7 +1262,21 @@ h1 {
     }
 
     .container {
-        padding: 15px;
+        padding: 12px;
+    }
+
+    .monthly-status-item {
+        font-size: 0.8rem;
+        padding: 5px 8px;
+    }
+
+    .monthly-status-value {
+        font-size: 1rem;
+    }
+
+    .filter-btn {
+        font-size: 0.85rem;
+        padding: 8px 10px;
     }
 
     .calendar-day {
@@ -1200,6 +1289,11 @@ h1 {
 
     .location-indicator {
         font-size: 1rem;
+    }
+
+    .modal-content {
+        margin: 5% auto;
+        padding: 16px;
     }
 }
 
