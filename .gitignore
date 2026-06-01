@@ -1,5 +1,7 @@
-# Firebase config (keep your API keys private)
-config.js
+# Firebase config
+# Note: Firebase web config is not secret (it's public in client-side apps).
+# Security is enforced via Firestore rules and API key domain restrictions.
+# config.js is committed so GitHub Pages can serve it.
 firebase-config.js
 
 # OS files
