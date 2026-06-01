@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// Firestore security rules for work-location-calendar.
+//
+// Model:
+//   /users/{userId}                 - per-user calendar document (owner-only)
+//   /users/{userId}/{sub=**}        - any subcollections owned by that user
+//
+// Requirements:
+//   - Enable Firebase Authentication (Anonymous, Email, or Google) in the
+//     Firebase console. Without auth these rules deny all access.
+//   - The client must use `firebase.auth().currentUser.uid` as the document
+//     ID under /users instead of a free-form display name.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+
+      match /{sub=**} {
+        allow read, write: if request.auth != null
+                           && request.auth.uid == userId;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

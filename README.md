@@ -64,24 +64,28 @@ window.firebaseConfig = {
 
 ### 3. Firestore Security Rules (Important!)
 
-For production use, you should set up proper security rules. In Firebase Console:
-
-1. Go to Firestore Database → Rules
-2. Update the rules to allow read/write access (for development/test):
+A starter ruleset is provided in [`firestore.rules`](./firestore.rules). It requires
+Firebase Authentication and restricts each user document to its owner:
 
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      // Allow users to read/write their own data
-      allow read, write: if true; // For testing - restrict this in production!
-    }
-  }
+match /users/{userId} {
+  allow read, write: if request.auth != null && request.auth.uid == userId;
 }
 ```
 
-**⚠️ Security Note:** The rule above allows anyone to read/write data. For production, implement proper authentication (e.g., Firebase Authentication) and restrict access accordingly.
+To deploy:
+
+1. Enable an auth provider in Firebase Console → Authentication → Sign-in method
+   (Anonymous is the lowest-friction option).
+2. In Firebase Console → Firestore Database → Rules, paste the contents of
+   `firestore.rules` and publish.
+3. Update the client to sign in (e.g. `firebase.auth().signInAnonymously()`) and
+   to use `auth().currentUser.uid` as the document ID under `/users` instead of
+   the typed display name.
+
+**⚠️ Do not ship with `allow read, write: if true`.** With your Firebase web
+config public (it is bundled into any deployed site), open rules let anyone
+read or wipe every user's calendar.
 
 ### 4. Testing the Setup
 
