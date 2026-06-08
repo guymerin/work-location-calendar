@@ -62,10 +62,11 @@ window.firebaseConfig = {
 
 **⚠️ Important:** Make sure `config.js` is properly configured. The app will show a setup screen if Firebase is not configured correctly.
 
-### 3. Firestore Security Rules (Important!)
+### 3. Authentication (Google Sign-In)
 
-A starter ruleset is provided in [`firestore.rules`](./firestore.rules). It requires
-Firebase Authentication and restricts each user document to its owner:
+The app authenticates with **Google Sign-In** via Firebase Authentication. Each
+user's data is stored under their Firebase `uid`, and the security rules in
+[`firestore.rules`](./firestore.rules) restrict every document to its owner:
 
 ```
 match /users/{userId} {
@@ -73,25 +74,41 @@ match /users/{userId} {
 }
 ```
 
-To deploy:
+**Enable it in the Firebase Console (only you can do this):**
 
-1. Enable an auth provider in Firebase Console → Authentication → Sign-in method
-   (Anonymous is the lowest-friction option).
-2. In Firebase Console → Firestore Database → Rules, paste the contents of
-   `firestore.rules` and publish.
-3. Update the client to sign in (e.g. `firebase.auth().signInAnonymously()`) and
-   to use `auth().currentUser.uid` as the document ID under `/users` instead of
-   the typed display name.
+1. **Authentication → Sign-in method → Add provider → Google → Enable**, then
+   save. Set a support email if prompted.
+2. **Authentication → Settings → Authorized domains** → add the domain you serve
+   from (e.g. `<your-username>.github.io`). `localhost` is authorized by default
+   for local testing.
 
-**⚠️ Do not ship with `allow read, write: if true`.** With your Firebase web
-config public (it is bundled into any deployed site), open rules let anyone
-read or wipe every user's calendar.
+### 4. Migration + cutover sequence (do this in order)
 
-### 4. Testing the Setup
+Older data was keyed by a typed name; the app now keys it by Google `uid`, so
+existing history must be copied once. **The in-app importer reads your old
+name-keyed document, which the strict owner-only rules forbid — so migrate while
+Firestore is still in open/test mode, then lock the rules.**
+
+1. Deploy this version of the app (rules still open / test mode for now).
+2. Enable Google sign-in + authorized domains (step 3 above).
+3. Open the app, click **Sign in with Google**. On first sign-in it offers to
+   **Import your existing data** — enter your old name (e.g. `Guy`) and import.
+   Confirm your calendar, activities, and goals appear.
+4. **Now** publish the strict rules: Firebase Console → Firestore Database →
+   Rules → paste the contents of `firestore.rules` → Publish.
+5. Verify the app still reads/writes after the rules go live.
+
+**⚠️ Do not leave `allow read, write: if true` in production.** Your Firebase web
+config is public (bundled into the deployed site), so open rules let anyone read
+or wipe every user's data. Open mode is only acceptable for the brief migration
+window in step 1–3.
+
+### 5. Testing the Setup
 
 1. **Check the app loads:** Open `index.html` in a web browser
 2. **If you see an error message:** Make sure `config.js` is configured correctly
-3. **If it loads successfully:** Enter your name and start marking your work location!
+3. **If it loads successfully:** click **Sign in with Google** and start marking
+   your work location.
 
 **💡 Tip:** If you need to verify your setup, open the browser's developer console (F12) to check for any Firebase connection errors.
 
@@ -127,7 +144,7 @@ read or wipe every user's calendar.
 
 ## Usage
 
-1. **Set Your Name**: Enter your name in the input field at the top
+1. **Sign In**: Click **Sign in with Google** at the top
 2. **Navigate Months**: Use "Previous" and "Next" buttons to move between months
 3. **Mark Location**: Click on any day to open the location selector
 4. **Choose Location**: Select Home 🏠, Office 🏢, or Clear ❌
@@ -137,13 +154,13 @@ read or wipe every user's calendar.
 
 The app stores data in Firestore with the following structure:
 - Collection: `users`
-- Document ID: User's name (the name they enter)
-- Fields: Date keys (YYYY-MM-DD format) with values "home" or "office"
+- Document ID: The signed-in user's Firebase Authentication `uid`
+- Fields: Date keys (YYYY-MM-DD format) with values "home", "office", or "nonworkday"
 
 Example:
 ```
 users/
-  └── John Doe/
+  └── a1B2c3D4e5...(uid)/
       ├── 2025-11-01: "home"
       ├── 2025-11-02: "office"
       └── 2025-11-03: "home"

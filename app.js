@@ -1,6 +1,7 @@
 // Firebase configuration - Load from config.js file
 let firebaseConfig;
 let db;
+let auth;
 
 try {
     // eslint-disable-next-line no-undef
@@ -8,10 +9,11 @@ try {
     if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
         throw new Error('Firebase config not properly set');
     }
-    
+
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    auth = firebase.auth();
 } catch (error) {
     console.error('Firebase configuration error:', error);
     document.body.innerHTML = `
@@ -43,7 +45,10 @@ try {
 
 // State management
 let currentDate = new Date();
-let currentUser = localStorage.getItem('currentUser') || '';
+// currentUser holds the authenticated Firebase uid (used as the Firestore doc id);
+// currentUserName is the human-readable Google display name shown in the UI.
+let currentUser = '';
+let currentUserName = '';
 let currentUserData = null;
 let currentUserDataPromise = null;
 let currentUserDocUnsubscribe = null;
@@ -141,11 +146,13 @@ function subscribeToUserDoc() {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if we're returning from Strava OAuth
-    handleStravaOAuthCallback();
     initializeApp();
     setupAccessibleModals();
 });
+
+// The Strava OAuth callback writes tokens to the signed-in user's doc, so it must
+// wait until Firebase Auth has resolved the current user (see onSignedIn).
+let stravaCallbackHandled = false;
 
 // Centralized accessibility behavior for all `.modal` dialogs: focus is moved
 // into a dialog when it opens and restored when it closes, Tab is trapped
@@ -336,21 +343,21 @@ function handleStravaOAuthCallback() {
 
 
 function initializeApp() {
-    // Load saved user name
-    if (currentUser) {
-        document.getElementById('userName').value = currentUser;
-        updateUserStatus();
+    // Authentication
+    document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
+    document.getElementById('signOutBtn').addEventListener('click', signOutUser);
+    initializeMigrateModal();
+    if (auth) {
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                onSignedIn(user);
+            } else {
+                onSignedOut();
+            }
+        });
     }
 
     // Event listeners
-    document.getElementById('setUserName').addEventListener('click', setUserName);
-    document.getElementById('userName').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            setUserName();
-        }
-    });
-    initializeLoginModal();
     document.getElementById('prevMonth').addEventListener('click', () => changeMonth(-1));
     document.getElementById('nextMonth').addEventListener('click', () => changeMonth(1));
     
@@ -438,202 +445,174 @@ function initializeModalListeners() {
     });
 }
 
-// Hash a (username, password) pair with SHA-256 using a fixed app salt + the
-// normalized username as an additional per-user salt. Returns hex string.
-async function hashPassword(name, password) {
-    const salt = 'wlc::v1::' + name.trim().toLowerCase();
-    const encoder = new TextEncoder();
-    const data = encoder.encode(salt + '::' + password);
-    const buf = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(buf))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+// ----- Google authentication -----
+
+function signInWithGoogle() {
+    if (!auth) {
+        alert('Authentication is not available. Check the Firebase configuration.');
+        return;
+    }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(err => {
+        console.error('Google sign-in failed:', err);
+        // Quietly ignore the user dismissing the popup.
+        if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+            alert('Sign-in failed: ' + (err.message || err.code));
+        }
+    });
 }
 
-// Pending login context, populated by setUserName() and consumed by submitLogin().
-let loginState = { name: '', existingHash: null, mode: 'verify' };
-
-// Entry point from the header "Set Name" button: validate the name, look up the
-// user doc to decide verify-vs-setup, then open the login dialog. All password
-// entry/validation happens in that dialog (no window.prompt/alert chains).
-async function setUserName() {
-    const userNameInput = document.getElementById('userName');
-    const name = userNameInput.value.trim();
-
-    if (!name) {
-        userNameInput.focus();
-        return;
-    }
-
-    if (!db) {
-        alert('Database not initialized — cannot verify password.');
-        return;
-    }
-
-    // Look up the user's doc to decide between verify and first-time setup.
-    let docSnap;
-    try {
-        docSnap = await db.collection('users').doc(name).get();
-    } catch (err) {
-        console.error('Error reading user doc:', err);
-        alert('Could not reach the database. Please try again.');
-        return;
-    }
-
-    const existingHash = docSnap.exists ? docSnap.data().passwordHash : null;
-    loginState = {
-        name,
-        existingHash,
-        mode: existingHash ? 'verify' : 'setup'
-    };
-    openLoginModal();
+function signOutUser() {
+    if (!auth) return;
+    auth.signOut().catch(err => console.error('Sign-out failed:', err));
 }
 
-function setLoginError(msg) {
-    const errorEl = document.getElementById('loginError');
+// Invoked by onAuthStateChanged once Firebase resolves a signed-in user.
+function onSignedIn(user) {
+    currentUser = user.uid;
+    currentUserName = user.displayName || user.email || 'Account';
+    updateUserStatus();
+    updateAuthButtons(true);
+    clearCurrentUserData();
+    subscribeToUserDoc();
+
+    // Strava OAuth callback writes to the user doc, so run it only now that we
+    // have an authenticated user — and only once per page load.
+    if (!stravaCallbackHandled) {
+        stravaCallbackHandled = true;
+        handleStravaOAuthCallback();
+    }
+
+    checkStravaConnection();
+    checkGarminConnection();
+
+    renderCalendar();
+    updateStats();
+
+    maybeOfferMigration();
+}
+
+function onSignedOut() {
+    if (typeof currentUserDocUnsubscribe === 'function') {
+        currentUserDocUnsubscribe();
+        currentUserDocUnsubscribe = null;
+    }
+    currentUser = '';
+    currentUserName = '';
+    clearCurrentUserData();
+    updateUserStatus();
+    updateAuthButtons(false);
+    renderCalendar();
+    updateStats();
+}
+
+function updateUserStatus() {
+    const statusDiv = document.getElementById('userStatus');
+    if (!statusDiv) return;
+    if (currentUser) {
+        statusDiv.textContent = `Signed in as: ${currentUserName}`;
+        statusDiv.style.display = 'block';
+    } else {
+        statusDiv.style.display = 'none';
+    }
+}
+
+function updateAuthButtons(signedIn) {
+    const signInBtn = document.getElementById('googleSignInBtn');
+    const signOutBtn = document.getElementById('signOutBtn');
+    if (signInBtn) signInBtn.style.display = signedIn ? 'none' : 'inline-flex';
+    if (signOutBtn) signOutBtn.style.display = signedIn ? 'inline-flex' : 'none';
+}
+
+// ----- One-time data migration from the legacy name-keyed document -----
+
+function setMigrateError(msg) {
+    const errorEl = document.getElementById('migrateError');
     if (!errorEl) return;
     errorEl.textContent = msg || '';
     errorEl.style.display = msg ? 'block' : 'none';
 }
 
-function setPasswordVisible(visible) {
-    const pwInput = document.getElementById('loginPassword');
-    const confirmInput = document.getElementById('loginConfirm');
-    const toggle = document.getElementById('loginPwToggle');
-    const type = visible ? 'text' : 'password';
-    if (pwInput) pwInput.type = type;
-    if (confirmInput) confirmInput.type = type;
-    if (toggle) {
-        toggle.setAttribute('aria-pressed', String(visible));
-        toggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
-        toggle.textContent = visible ? '🙈' : '👁️';
+// If the signed-in user's uid document has no calendar data yet, offer to import
+// it from a legacy document keyed by their old display name.
+async function maybeOfferMigration() {
+    if (!db || !currentUser) return;
+    try {
+        const snap = await db.collection('users').doc(currentUser).get();
+        const data = snap.exists ? snap.data() : {};
+        const hasCalendarData = Object.keys(data).some(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+        if (hasCalendarData) return; // already has data — nothing to migrate
+        const modal = document.getElementById('migrateModal');
+        if (modal) {
+            setMigrateError('');
+            const nameInput = document.getElementById('migrateName');
+            if (nameInput) nameInput.value = '';
+            modal.style.display = 'block';
+        }
+    } catch (err) {
+        console.error('Migration check failed:', err);
     }
 }
 
-function openLoginModal() {
-    const modal = document.getElementById('loginModal');
-    const title = document.getElementById('loginModalTitle');
-    const subtitle = document.getElementById('loginModalSubtitle');
-    const nameInput = document.getElementById('loginName');
-    const pwInput = document.getElementById('loginPassword');
-    const confirmField = document.getElementById('loginConfirmField');
-    const confirmInput = document.getElementById('loginConfirm');
-    const submitBtn = document.getElementById('loginSubmit');
-
-    nameInput.value = loginState.name;
-    pwInput.value = '';
-    confirmInput.value = '';
-    setLoginError('');
-    setPasswordVisible(false);
-
-    if (loginState.mode === 'verify') {
-        title.textContent = 'Log in';
-        subtitle.textContent = `Enter the password for "${loginState.name}".`;
-        confirmField.style.display = 'none';
-        pwInput.setAttribute('autocomplete', 'current-password');
-        submitBtn.textContent = 'Log in';
-    } else {
-        title.textContent = 'Create password';
-        subtitle.textContent = `Set a password for "${loginState.name}" (at least 4 characters).`;
-        confirmField.style.display = 'block';
-        pwInput.setAttribute('autocomplete', 'new-password');
-        submitBtn.textContent = 'Create account';
-    }
-
-    modal.style.display = 'block';
-    // The accessible-modal layer focuses the dialog container on open; move focus
-    // to the password field on the next tick so it wins.
-    setTimeout(() => pwInput.focus(), 0);
-}
-
-async function submitLogin(e) {
+async function runMigration(e) {
     if (e) e.preventDefault();
-    const pwInput = document.getElementById('loginPassword');
-    const confirmInput = document.getElementById('loginConfirm');
-    const submitBtn = document.getElementById('loginSubmit');
-    const pwd = pwInput.value;
+    const nameInput = document.getElementById('migrateName');
+    const submitBtn = document.getElementById('migrateSubmit');
+    const oldName = (nameInput.value || '').trim();
+
+    if (!oldName) {
+        setMigrateError('Enter the name you used previously.');
+        nameInput.focus();
+        return;
+    }
+    if (oldName === currentUser) {
+        setMigrateError('That is already your account.');
+        return;
+    }
 
     submitBtn.disabled = true;
+    setMigrateError('');
     try {
-        if (loginState.mode === 'verify') {
-            const enteredHash = await hashPassword(loginState.name, pwd);
-            if (enteredHash !== loginState.existingHash) {
-                setLoginError('Incorrect password.');
-                pwInput.focus();
-                pwInput.select();
-                return;
-            }
-        } else {
-            if (!pwd || pwd.length < 4) {
-                setLoginError('Password must be at least 4 characters.');
-                pwInput.focus();
-                return;
-            }
-            if (confirmInput.value !== pwd) {
-                setLoginError('Passwords do not match.');
-                confirmInput.focus();
-                return;
-            }
-            const newHash = await hashPassword(loginState.name, pwd);
-            try {
-                await db.collection('users').doc(loginState.name).set({ passwordHash: newHash }, { merge: true });
-            } catch (err) {
-                console.error('Error saving password:', err);
-                setLoginError('Could not save password. Please try again.');
-                return;
-            }
+        const oldSnap = await db.collection('users').doc(oldName).get();
+        if (!oldSnap.exists) {
+            setMigrateError(`No saved data found for "${oldName}".`);
+            return;
         }
+        const data = oldSnap.data() || {};
+        // Don't carry the legacy password hash into the authenticated account.
+        delete data.passwordHash;
 
-        document.getElementById('loginModal').style.display = 'none';
-        finishLogin(loginState.name);
+        await db.collection('users').doc(currentUser).set(data, { merge: true });
+
+        document.getElementById('migrateModal').style.display = 'none';
+        clearCurrentUserData();
+        subscribeToUserDoc();
+        checkStravaConnection();
+        checkGarminConnection();
+        renderCalendar();
+        updateStats();
+    } catch (err) {
+        console.error('Migration failed:', err);
+        setMigrateError('Import failed: ' + (err.message || err.code || 'unknown error'));
     } finally {
         submitBtn.disabled = false;
     }
 }
 
-function finishLogin(name) {
-    currentUser = name;
-    localStorage.setItem('currentUser', currentUser);
-    updateUserStatus();
-    clearCurrentUserData();
-    subscribeToUserDoc();
-
-    // Check Strava and Garmin connection status after setting user
-    checkStravaConnection();
-    checkGarminConnection();
-
-    renderCalendar(); // This will also update stats
-    updateStats(); // Also update stats directly
-}
-
-function initializeLoginModal() {
-    const modal = document.getElementById('loginModal');
+function initializeMigrateModal() {
+    const modal = document.getElementById('migrateModal');
     if (!modal) return;
-    const form = document.getElementById('loginForm');
-    const closeBtn = document.getElementById('loginModalClose');
-    const toggle = document.getElementById('loginPwToggle');
+    const form = document.getElementById('migrateForm');
+    const closeBtn = document.getElementById('migrateModalClose');
+    const skipBtn = document.getElementById('migrateSkip');
 
-    if (form) form.addEventListener('submit', submitLogin);
+    if (form) form.addEventListener('submit', runMigration);
     if (closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-    if (toggle) {
-        toggle.addEventListener('click', () => {
-            setPasswordVisible(toggle.getAttribute('aria-pressed') !== 'true');
-        });
-    }
+    if (skipBtn) skipBtn.addEventListener('click', () => { modal.style.display = 'none'; });
     // Close on backdrop click.
     window.addEventListener('click', (e) => {
         if (e.target === modal) modal.style.display = 'none';
     });
-}
-
-function updateUserStatus() {
-    const statusDiv = document.getElementById('userStatus');
-    if (currentUser) {
-        statusDiv.textContent = `Logged in as: ${currentUser}`;
-        statusDiv.style.display = 'block';
-    } else {
-        statusDiv.style.display = 'none';
-    }
 }
 
 function changeMonth(direction) {

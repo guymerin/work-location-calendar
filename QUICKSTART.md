@@ -51,8 +51,11 @@ window.firebaseConfig = {
 ### 4️⃣ Test It!
 
 1. Open `index.html` in your browser
-2. Enter your name
+2. Click **Sign in with Google**
 3. Click on any day to mark it as Home 🏠 or Office 🏢
+
+> First time signing in? Enable Google sign-in in the Firebase console and run the
+> one-time data import — see [FIREBASE_CHECKLIST.md](./FIREBASE_CHECKLIST.md).
 
 ## Troubleshooting
 

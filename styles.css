@@ -85,6 +85,70 @@ h1 {
     background: #5568d3;
 }
 
+.google-signin-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: white;
+    color: #444;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: box-shadow 0.2s, background 0.2s;
+}
+
+.google-signin-btn:hover {
+    box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3);
+    background: #f8f9fa;
+}
+
+.google-signin-btn .g-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4285f4, #ea4335 60%, #fbbc05);
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.signout-btn {
+    padding: 10px 16px;
+    background: #f5f5f5;
+    color: #444;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.signout-btn:hover {
+    background: #ececec;
+}
+
+.login-skip {
+    margin-top: 12px;
+    background: none;
+    border: none;
+    color: #667eea;
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-decoration: underline;
+    align-self: center;
+    padding: 6px;
+}
+
+.login-skip:hover {
+    color: #5568d3;
+}
+
 /* ----- Login dialog ----- */
 .login-subtitle {
     margin: 0 0 18px;
