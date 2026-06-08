@@ -1,38 +1,51 @@
 # Tests
 
-Headless end-to-end smoke test for the calendar. It loads the real
-`index.html` / `app.js` / `styles.css` in Chromium (via Playwright) but swaps
+Headless end-to-end smoke tests for the calendar. They load the real
+`index.html` / `app.js` / `styles.css` in a browser (via Playwright) but swap
 Firebase for an **in-memory mock** seeded under a throwaway uid.
 
-**It never contacts the real Firebase project**, so it cannot read or modify any
-real user's data — the test asserts zero requests to `*.googleapis.com` /
+**They never contact the real Firebase project**, so they cannot read or modify
+any real user's data — each run asserts zero requests to `*.googleapis.com` /
 `identitytoolkit` / etc.
 
 ## Run
 
 ```bash
 cd test
-npm install   # one-time; also downloads the Chromium build
-npm test
+npm install        # one-time; also downloads Chromium + WebKit builds
+
+npm test           # desktop (Chromium)
+npm run test:mobile  # iOS (Mobile Safari/WebKit) + Android (Mobile Chrome/Chromium)
 ```
 
-A run prints PASS/FAIL for each check and writes screenshots to
+Each run prints PASS/FAIL per check and writes screenshots to
 `test/screenshots/` (gitignored):
 
-- `01-calendar.png` — month populated with mock data + BELT/weekly stats
-- `02-modal-open.png` — the day location picker
+- `desktop-calendar.png` / `desktop-modal.png`
+- `ios-calendar.png` / `ios-modal.png`
+- `android-calendar.png` / `android-modal.png`
 
 ## What it covers
 
 - Calendar renders home/office/non-work-day indicators from data
 - BELT + weekly-average stats compute and display
-- Day click opens the location picker
-- Picker closes via **Esc**, the **×** button, and **backdrop click**
+- Day tap/click opens the location picker
+- Picker closes via **Esc** (desktop), the **×** button, and **backdrop** tap/click
 - Aborting the picker writes nothing to Firestore
 - No requests reach the real Firebase backend; no page errors
 
-## Adding cases
+Mobile runs use Playwright device descriptors (iPhone 13, Pixel 7), so mobile
+viewport, touch taps, and the mobile user-agent are all exercised. The Esc check
+is skipped on touch devices (no physical keyboard); the ×/backdrop paths cover
+closing there.
 
-Everything lives in `modal.test.mjs`. The `check(name, cond, extra)` helper
-records a pass/fail; the process exits non-zero if any check fails (CI-friendly).
-Adjust the seeded `mockData` / `mockDoc` near the top to exercise other states.
+## Layout
+
+- `harness.mjs` — shared mock data, the in-memory Firebase mock, and the
+  `runChecks()` flow used by both runners.
+- `modal.test.mjs` — desktop runner.
+- `mobile.test.mjs` — iOS + Android runner.
+
+`runChecks` exits the process non-zero if any check fails (CI-friendly). To
+exercise other states, adjust the seeded data in `buildMockDoc()` in
+`harness.mjs`.
