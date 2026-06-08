@@ -84,6 +84,7 @@ let currentDate = new Date();
 // currentUserName is the human-readable Google display name shown in the UI.
 let currentUser = '';
 let currentUserName = '';
+let currentUserEmail = ''; // Google account email, shown on hover over the name
 let currentUserData = null;
 let currentUserDataPromise = null;
 let currentUserDocUnsubscribe = null;
@@ -499,6 +500,7 @@ function signOutUser() {
 function onSignedIn(user) {
     currentUser = user.uid;
     currentUserName = user.displayName || user.email || 'Account';
+    currentUserEmail = user.email || '';
     updateUserStatus();
     updateAuthButtons(true);
     clearCurrentUserData();
@@ -526,6 +528,7 @@ function onSignedOut() {
     }
     currentUser = '';
     currentUserName = '';
+    currentUserEmail = '';
     clearCurrentUserData();
     updateUserStatus();
     updateAuthButtons(false);
@@ -538,7 +541,8 @@ function updateUserStatus() {
     if (!nameEl) return;
     if (currentUser) {
         nameEl.textContent = currentUserName;
-        nameEl.title = `Signed in as ${currentUserName}`;
+        // Show the Google account email on hover (fall back to the name).
+        nameEl.title = currentUserEmail || `Signed in as ${currentUserName}`;
         nameEl.style.display = 'inline-flex';
     } else {
         nameEl.textContent = '';
