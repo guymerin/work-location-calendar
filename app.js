@@ -199,7 +199,10 @@ let stravaCallbackHandled = false;
 function setupAccessibleModals() {
     let lastFocused = null;
 
-    const isVisible = (el) => !!el && el.style.display !== 'none' && el.offsetParent !== null;
+    // .modal containers are position:fixed, so offsetParent is always null even
+    // when shown — rely on computed display instead, otherwise nothing is ever
+    // "visible" and Escape-to-close / focus management never fire.
+    const isVisible = (el) => !!el && getComputedStyle(el).display !== 'none';
 
     // The most recently shown visible modal is the active one (modals don't stack
     // here, but this is robust if one is opened from another).
