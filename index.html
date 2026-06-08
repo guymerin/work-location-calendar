@@ -147,8 +147,8 @@
     </div>
 
     <div id="modal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalDate">
+            <span class="close" role="button" tabindex="0" aria-label="Close dialog">&times;</span>
             <h3 id="modalDate"></h3>
             <div class="location-options">
                 <button class="location-btn home-btn" data-location="home">
@@ -172,9 +172,9 @@
     </div>
 
     <div id="stravaModal" class="modal">
-        <div class="modal-content">
-            <span class="close" id="stravaModalClose">&times;</span>
-            <h3>Connect Strava</h3>
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="stravaModalTitle">
+            <span class="close" id="stravaModalClose" role="button" tabindex="0" aria-label="Close dialog">&times;</span>
+            <h3 id="stravaModalTitle">Connect Strava</h3>
             <div class="strava-connect-section">
                 <p>To connect your Strava account, you'll need to get an access token:</p>
                 <ol style="text-align: left; margin: 20px 0; padding-left: 20px; line-height: 1.8;">
@@ -215,9 +215,9 @@
     </div>
 
     <div id="settingsModal" class="modal">
-        <div class="modal-content settings-modal-content">
-            <span class="close" id="settingsModalClose">&times;</span>
-            <h3>Settings</h3>
+        <div class="modal-content settings-modal-content" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+            <span class="close" id="settingsModalClose" role="button" tabindex="0" aria-label="Close dialog">&times;</span>
+            <h3 id="settingsModalTitle">Settings</h3>
             
             <!-- Strava Connection Section -->
             <div class="settings-section">
@@ -439,8 +439,8 @@ else:
     </div>
 
     <div id="beltOverviewModal" class="modal">
-        <div class="modal-content belt-overview-content">
-            <span class="close" id="beltOverviewClose">&times;</span>
+        <div class="modal-content belt-overview-content" role="dialog" aria-modal="true" aria-labelledby="beltOverviewTitle">
+            <span class="close" id="beltOverviewClose" role="button" tabindex="0" aria-label="Close dialog">&times;</span>
             <h3 id="beltOverviewTitle">BELT Overview</h3>
             <div id="beltOverviewSummary" class="belt-overview-summary"></div>
             <table class="belt-overview-table">

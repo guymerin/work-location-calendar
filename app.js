@@ -144,7 +144,83 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if we're returning from Strava OAuth
     handleStravaOAuthCallback();
     initializeApp();
+    setupAccessibleModals();
 });
+
+// Centralized accessibility behavior for all `.modal` dialogs: focus is moved
+// into a dialog when it opens and restored when it closes, Tab is trapped
+// inside the open dialog, and Escape (or Enter/Space on the × control) closes
+// it. A MutationObserver watches each modal's inline display so we don't have
+// to hook the ~15 scattered show/hide call sites.
+function setupAccessibleModals() {
+    let lastFocused = null;
+
+    const isVisible = (el) => !!el && el.style.display !== 'none' && el.offsetParent !== null;
+
+    // The most recently shown visible modal is the active one (modals don't stack
+    // here, but this is robust if one is opened from another).
+    const activeModal = () =>
+        Array.from(document.querySelectorAll('.modal')).filter(isVisible).pop() || null;
+
+    const focusableIn = (modal) =>
+        Array.from(modal.querySelectorAll(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )).filter(el => el.offsetParent !== null);
+
+    document.querySelectorAll('.modal').forEach((modal) => {
+        // Make the dialog container itself programmatically focusable so that,
+        // on open, focus lands on it and screen readers announce the dialog's
+        // accessible name (aria-labelledby) rather than the × button.
+        const dialog = modal.querySelector('[role="dialog"]') || modal;
+        if (!dialog.hasAttribute('tabindex')) dialog.setAttribute('tabindex', '-1');
+
+        let wasVisible = isVisible(modal);
+        new MutationObserver(() => {
+            const visible = isVisible(modal);
+            if (visible && !wasVisible) {
+                lastFocused = document.activeElement;
+                dialog.focus();
+            } else if (!visible && wasVisible) {
+                if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
+                lastFocused = null;
+            }
+            wasVisible = visible;
+        }).observe(modal, { attributes: true, attributeFilter: ['style'] });
+    });
+
+    document.addEventListener('keydown', (e) => {
+        // Activate the × close control with the keyboard.
+        if ((e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') &&
+            e.target.classList && e.target.classList.contains('close')) {
+            e.preventDefault();
+            e.target.click();
+            return;
+        }
+
+        const modal = activeModal();
+        if (!modal) return;
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            modal.style.display = 'none';
+            return;
+        }
+
+        if (e.key === 'Tab') {
+            const f = focusableIn(modal);
+            if (f.length === 0) { e.preventDefault(); return; }
+            const first = f[0];
+            const last = f[f.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+    });
+}
 
 // Handle OAuth callback from Strava
 function handleStravaOAuthCallback() {
