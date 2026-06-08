@@ -453,20 +453,23 @@ function initializeApp() {
 }
 
 function initializeModalListeners() {
-    // Close button
-    const closeBtn = document.querySelector('.close');
+    // Close button. Scope to the location modal: a bare '.close' selector matches
+    // the first close control in the document (the migrate modal's), leaving the
+    // location picker's × with no click handler.
+    const closeBtn = document.querySelector('#modal .close');
     if (closeBtn) {
         const newCloseBtn = closeBtn.cloneNode(true);
         closeBtn.replaceWith(newCloseBtn);
         newCloseBtn.addEventListener('click', closeModal);
     }
-    
-    // Location buttons
-    document.querySelectorAll('.location-btn').forEach(btn => {
+
+    // Location buttons. Scope to the location modal so we don't also rewire the
+    // Strava modal's save button, which shares the .location-btn class.
+    document.querySelectorAll('#modal .location-btn').forEach(btn => {
         const newBtn = btn.cloneNode(true);
         btn.replaceWith(newBtn);
     });
-    document.querySelectorAll('.location-btn').forEach(btn => {
+    document.querySelectorAll('#modal .location-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const location = e.currentTarget.getAttribute('data-location');
             saveLocation(selectedDate, location);
