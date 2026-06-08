@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Content Security Policy: blocks injected inline scripts/handlers (XSS).
+         script-src intentionally omits 'unsafe-inline' (the app uses no inline
+         scripts/handlers). connect/frame allow Firebase Auth+Firestore, Google
+         sign-in, Strava and Garmin. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://www.strava.com https://connectapi.garmin.com https://rto-db.firebaseapp.com; frame-src 'self' https://rto-db.firebaseapp.com https://accounts.google.com https://apis.google.com;">
     <meta name="theme-color" content="#667eea">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -477,7 +482,7 @@ else:
         </div>
     </div>
 
-    <script src="app.js?v=20260607b"></script>
+    <script src="app.js?v=20260607c"></script>
 </body>
 </html>
 

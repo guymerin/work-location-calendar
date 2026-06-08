@@ -43,6 +43,17 @@ try {
     `;
 }
 
+// Escape a string for safe interpolation into innerHTML (prevents XSS from
+// values that originate outside our control, e.g. OAuth URL parameters).
+function escapeHtml(unsafe) {
+    return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // State management
 let currentDate = new Date();
 // currentUser holds the authenticated Firebase uid (used as the Firestore doc id);
@@ -243,7 +254,7 @@ function handleStravaOAuthCallback() {
             statusDiv.style.display = 'block';
             statusDiv.style.background = '#ffebee';
             statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = `❌ Authorization failed: ${error}`;
+            statusDiv.textContent = `❌ Authorization failed: ${error}`;
         } else {
         alert(`Strava authorization failed: ${error}`);
         }
@@ -282,14 +293,14 @@ function handleStravaOAuthCallback() {
             if (instructions) {
                 instructions.innerHTML = `
                     <p style="color: #4caf50; font-weight: 600;">✅ Authorization code received!</p>
-                    <p>Your authorization code: <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${code}</code></p>
+                    <p>Your authorization code: <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${escapeHtml(code)}</code></p>
                     <p>To exchange this code for an access token, you need to make a POST request:</p>
                     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; font-family: monospace; font-size: 0.9em;">
                         <strong>POST</strong> https://www.strava.com/oauth/token<br><br>
                         <strong>Body (form-data or JSON):</strong><br>
                         client_id: YOUR_CLIENT_ID<br>
                         client_secret: YOUR_CLIENT_SECRET<br>
-                        code: ${code}<br>
+                        code: ${escapeHtml(code)}<br>
                         grant_type: authorization_code
                     </div>
                     <p>You can use <a href="https://www.postman.com/" target="_blank">Postman</a>, <a href="https://httpie.io/" target="_blank">HTTPie</a>, or curl to make this request.</p>
@@ -299,7 +310,7 @@ function handleStravaOAuthCallback() {
                             curl -X POST https://www.strava.com/oauth/token \\<br>
                             &nbsp;&nbsp;-d client_id=YOUR_CLIENT_ID \\<br>
                             &nbsp;&nbsp;-d client_secret=YOUR_CLIENT_SECRET \\<br>
-                            &nbsp;&nbsp;-d code=${code} \\<br>
+                            &nbsp;&nbsp;-d code=${escapeHtml(code)} \\<br>
                             &nbsp;&nbsp;-d grant_type=authorization_code
                         </code>
                     </p>
@@ -1072,7 +1083,7 @@ function createDayElement(day, year, month) {
 
         const activate = () => {
             if (!currentUser) {
-                alert('Please enter your name first');
+                alert('Please sign in with Google first');
                 return;
             }
             if (whatIfMode && !isFutureOrToday(date)) {
@@ -1134,7 +1145,7 @@ function closeModal() {
 
 function saveLocation(date, location) {
     if (!currentUser) {
-        alert('Please enter your name first');
+        alert('Please sign in with Google first');
         return;
     }
 
@@ -1270,6 +1281,18 @@ function isRunningActivity(activity) {
            activityName.includes('jog');
 }
 
+// Garmin equivalent of isRunningActivity. Run-variant typeKeys are running,
+// trail_running, treadmill_running, virtual_run, etc. (all contain "run").
+// Walking and elliptical are deliberately NOT runs (they have their own icons).
+// This is the single source of truth for both the Garmin 🏃 icon and the count.
+function isGarminRunningActivity(activity) {
+    const activityType = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
+    const activityName = (activity.activityName || activity.name || '').toLowerCase();
+    return activityType.includes('run') ||
+           activityName.includes('run') ||
+           activityName.includes('jog');
+}
+
 // Helper function to check if an activity is weight training
 function isWeightTrainingActivity(activity) {
     const activityType = activity.type || 'Run';
@@ -1322,6 +1345,49 @@ function isSkiActivity(activity) {
            activityName.includes('ski') ||
            activityName.includes('snowshoe') ||
            activityName.includes('snow shoe');
+}
+
+// Source-agnostic activity classifier: returns the set of health categories an
+// activity belongs to ('running' | 'weights' | 'coldPlunge' | 'yoga' | 'hiking'
+// | 'ski'). This is the single place that decides what each activity "is",
+// replacing the classification logic that used to be duplicated between the
+// Strava helpers above and the inline Garmin checks in addWeekStatsCells.
+// The per-source predicates below are intentionally identical to the originals.
+function getActivityCategories(activity, source) {
+    const categories = new Set();
+
+    if (source === 'garmin') {
+        const type = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
+        const name = (activity.activityName || activity.name || '').toLowerCase();
+
+        if (isGarminRunningActivity(activity)) categories.add('running');
+        if (type === 'strength_training' || type === 'weight_training' || type === 'crossfit' ||
+            name.includes('weight') || name.includes('f45') || name.includes('crossfit') || name.includes('gym')) {
+            categories.add('weights');
+        }
+        if ((type === 'workout' && name.includes('plunge')) || name.includes('cold plunge') || name.includes('coldplunge')) {
+            categories.add('coldPlunge');
+        }
+        if (type === 'yoga' || name.includes('yoga') || name.includes('stretching') || name.includes('meditation')) {
+            categories.add('yoga');
+        }
+        if (type === 'hiking' || (type === 'walking' && name.includes('hike')) || name.includes('hiking')) {
+            categories.add('hiking');
+        }
+        if (type === 'skiing' || type === 'alpine_skiing' || type === 'backcountry_skiing' || type === 'nordic_skiing' ||
+            name.includes('ski') || name.includes('snowshoe') || name.includes('snow shoe')) {
+            categories.add('ski');
+        }
+    } else { // strava
+        if (isRunningActivity(activity)) categories.add('running');
+        if (isWeightTrainingActivity(activity)) categories.add('weights');
+        if (isColdPlungeActivity(activity)) categories.add('coldPlunge');
+        if (isYogaActivity(activity)) categories.add('yoga');
+        if (isHikingActivity(activity)) categories.add('hiking');
+        if (isSkiActivity(activity)) categories.add('ski');
+    }
+
+    return categories;
 }
 
 function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, locationData = null) {
@@ -1436,88 +1502,22 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                     officeDays++;
                 }
 
-                // Check Strava activities
-                if (stravaActivities[dateKey] && stravaActivities[dateKey].length > 0) {
-                    const activities = stravaActivities[dateKey];
-                    
-                    activities.forEach(activity => {
-                        // Count as a run if classified as running OR if it shows
-                        // the 🏃 icon, so the tally can never be lower than the
-                        // number of runner icons displayed for the week.
-                        if (isRunningActivity(activity) || getActivityIcon(activity) === '🏃') {
-                            daysWithRunning.add(dateKey);
-                        }
-                        if (isWeightTrainingActivity(activity)) {
-                            daysWithWeightTraining.add(dateKey);
-                        }
-                        if (isColdPlungeActivity(activity)) {
-                            daysWithColdPlunge.add(dateKey);
-                        }
-                        if (isYogaActivity(activity)) {
-                            daysWithYoga.add(dateKey);
-                        }
-                        if (isHikingActivity(activity)) {
-                            daysWithHiking.add(dateKey);
-                        }
-                        if (isSkiActivity(activity)) {
-                            daysWithSki.add(dateKey);
-                        }
-                    });
-                }
-                
-                // Check Garmin activities
-                if (garminActivities[dateKey] && garminActivities[dateKey].length > 0) {
-                    const activities = garminActivities[dateKey];
-                    
-                    activities.forEach(activity => {
-                        const activityType = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
-                        const activityName = (activity.activityName || activity.name || '').toLowerCase();
-                        
-                        // Count as a run for any run-variant typeKey (running,
-                        // trail_running, treadmill_running, virtual_run, ...) or
-                        // if it shows the 🏃 icon, so the tally can never be
-                        // lower than the number of runner icons displayed.
-                        if (activityType.includes('run') || activityType === 'walking' || activityType === 'elliptical' ||
-                            activityName.includes('run') || activityName.includes('jog') ||
-                            getGarminActivityIcon(activity) === '🏃') {
-                            daysWithRunning.add(dateKey);
-                        }
-                        // Check for weight training
-                        if (activityType === 'strength_training' || activityType === 'weight_training' || activityType === 'crossfit' ||
-                            activityName.includes('weight') || activityName.includes('f45') || activityName.includes('crossfit') || activityName.includes('gym')) {
-                            daysWithWeightTraining.add(dateKey);
-                        }
-                        // Check for cold plunge
-                        if ((activityType === 'workout' && activityName.includes('plunge')) || 
-                            activityName.includes('cold plunge') || 
-                            activityName.includes('coldplunge')) {
-                            daysWithColdPlunge.add(dateKey);
-                        }
-                        // Check for yoga
-                        if (activityType === 'yoga' || 
-                            activityName.includes('yoga') || 
-                            activityName.includes('stretching') || 
-                            activityName.includes('meditation')) {
-                            daysWithYoga.add(dateKey);
-                        }
-                        // Check for hiking
-                        if (activityType === 'hiking' || 
-                            (activityType === 'walking' && activityName.includes('hike')) ||
-                            activityName.includes('hiking')) {
-                            daysWithHiking.add(dateKey);
-                        }
-                        // Check for skiing
-                        if (activityType === 'skiing' || 
-                            activityType === 'alpine_skiing' || 
-                            activityType === 'backcountry_skiing' || 
-                            activityType === 'nordic_skiing' ||
-                            activityName.includes('ski') || 
-                            activityName.includes('snowshoe') || 
-                            activityName.includes('snow shoe')) {
-                            daysWithSki.add(dateKey);
-                        }
-                    });
-                }
+                // Tally health activities from both sources through the shared
+                // classifier (getActivityCategories), so Strava and Garmin stay
+                // in sync by construction — one place decides what each activity is.
+                const categorySets = {
+                    running: daysWithRunning,
+                    weights: daysWithWeightTraining,
+                    coldPlunge: daysWithColdPlunge,
+                    yoga: daysWithYoga,
+                    hiking: daysWithHiking,
+                    ski: daysWithSki
+                };
+                const tallyActivity = (activity, source) => {
+                    getActivityCategories(activity, source).forEach(cat => categorySets[cat].add(dateKey));
+                };
+                (stravaActivities[dateKey] || []).forEach(a => tallyActivity(a, 'strava'));
+                (garminActivities[dateKey] || []).forEach(a => tallyActivity(a, 'garmin'));
             });
             
             // Only show stats if the week has started AND not all days are from next month
@@ -1837,7 +1837,7 @@ function initializeStravaButtons() {
     if (connectBtn) {
         connectBtn.addEventListener('click', () => {
             if (!currentUser) {
-                alert('Please enter your name first');
+                alert('Please sign in with Google first');
                 return;
             }
             // Show configuration section instead of opening separate modal
@@ -2085,7 +2085,7 @@ function initializeSettingsModal() {
     if (settingsBtn) {
         settingsBtn.addEventListener('click', () => {
             if (!currentUser) {
-                alert('Please enter your name first');
+                alert('Please sign in with Google first');
                 return;
             }
             loadUserGoals();
@@ -2344,7 +2344,7 @@ async function saveStravaActivitiesToDB(newActivities) {
 
 function saveStravaToken(accessToken, refreshToken) {
     if (!currentUser || !db) {
-        alert('Please enter your name first');
+        alert('Please sign in with Google first');
         return;
     }
     
@@ -2584,7 +2584,12 @@ async function fetchStravaActivities(accessToken, refreshToken) {
 function getActivityIcon(activity) {
     const activityType = activity.type || 'Run';
     const activityName = (activity.name || '').toLowerCase();
-    
+
+    // Running is the single source of truth: any activity that counts as a run
+    // shows the 🏃 icon, and only those count toward the weekly running tally.
+    // This keeps "icons shown" == "running days counted" by construction.
+    if (isRunningActivity(activity)) return '🏃';
+
     // Check if activity name contains yoga keywords (even if type is "Workout")
     const isYoga = activityName.includes('yoga') || 
                    activityName.includes('stretching') || 
@@ -2638,7 +2643,9 @@ function getActivityIcon(activity) {
         return '🚣';
     }
     
-    return typeIcons[activityType] || (isColdPlunge ? '🧊' : (isYoga ? '🧘' : (isSnowshoe ? '🎿' : '🏃')));
+    // Neutral fallback (🏅) for unrecognized activities — never 🏃, so a
+    // non-run (rowing, tennis, etc.) is never miscounted as a running day.
+    return typeIcons[activityType] || (isColdPlunge ? '🧊' : (isYoga ? '🧘' : (isSnowshoe ? '🎿' : '🏅')));
 }
 
 function loadStravaWorkout(year, month, day, dayElement) {
@@ -2709,7 +2716,7 @@ function initializeGarminButtons() {
     if (connectBtn) {
         connectBtn.addEventListener('click', () => {
             if (!currentUser) {
-                alert('Please enter your name first');
+                alert('Please sign in with Google first');
                 return;
             }
             // Show configuration section
@@ -2895,7 +2902,7 @@ async function saveGarminActivitiesToDB(newActivities) {
 
 function saveGarminToken(sessionToken) {
     if (!currentUser || !db) {
-        alert('Please enter your name first');
+        alert('Please sign in with Google first');
         return;
     }
     
@@ -3322,7 +3329,11 @@ function loadGarminWorkout(year, month, day, dayElement) {
 function getGarminActivityIcon(activity) {
     const activityType = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
     const activityName = (activity.activityName || activity.name || '').toLowerCase();
-    
+
+    // Running is the single source of truth (see isGarminRunningActivity): only
+    // true runs show 🏃, matching the weekly running-day count by construction.
+    if (isGarminRunningActivity(activity)) return '🏃';
+
     // Map Garmin activity types to icons (similar to Strava)
     const typeIcons = {
         'running': '🏃',
@@ -3334,7 +3345,6 @@ function getGarminActivityIcon(activity) {
         'strength_training': '🏋️',
         'weight_training': '🏋️',
         'crossfit': '🏋️',
-        'elliptical': '🏃',
         'rowing': '🚣',
         'indoor_rowing': '🚣'
     };
@@ -3356,6 +3366,8 @@ function getGarminActivityIcon(activity) {
         return '🏋️';
     }
     
-    return typeIcons[activityType] || '🏃';
+    // Neutral fallback (🏅) for unrecognized activities (incl. walking/elliptical
+    // and anything new) — never 🏃, so non-runs are never miscounted.
+    return typeIcons[activityType] || '🏅';
 }
 
