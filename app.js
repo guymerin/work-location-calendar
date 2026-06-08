@@ -54,6 +54,30 @@ function escapeHtml(unsafe) {
         .replace(/'/g, '&#039;');
 }
 
+// Non-blocking toast notification. Replaces alert() so messages don't freeze
+// the page and stay consistent with the app's visual language. type is one of
+// 'error' | 'success' | 'info'. Errors use role="alert" so screen readers
+// announce them immediately; others use role="status" (polite).
+function showToast(message, type = 'error', duration = 4500) {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        container.setAttribute('aria-live', 'polite');
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('toast--leaving');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
 // State management
 let currentDate = new Date();
 // currentUser holds the authenticated Firebase uid (used as the Firestore doc id);
@@ -152,6 +176,7 @@ function subscribeToUserDoc() {
         updateStats();
     }, error => {
         console.error('User document snapshot error:', error);
+        showToast('Lost connection to your data — recent changes may not be saved. Check your network.', 'error', 8000);
     });
 }
 
@@ -256,7 +281,7 @@ function handleStravaOAuthCallback() {
             statusDiv.style.color = '#c62828';
             statusDiv.textContent = `❌ Authorization failed: ${error}`;
         } else {
-        alert(`Strava authorization failed: ${error}`);
+        showToast(`Strava authorization failed: ${error}`);
         }
         // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -338,7 +363,7 @@ function handleStravaOAuthCallback() {
                             if (token) {
                                 saveStravaToken(token, null);
                             } else {
-                                alert('Please enter an access token');
+                                showToast('Please enter an access token');
                             }
                         });
                     }
@@ -357,6 +382,8 @@ function initializeApp() {
     // Authentication
     document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
     document.getElementById('signOutBtn').addEventListener('click', signOutUser);
+    const promptSignInBtn = document.getElementById('promptSignInBtn');
+    if (promptSignInBtn) promptSignInBtn.addEventListener('click', signInWithGoogle);
     initializeMigrateModal();
     if (auth) {
         auth.onAuthStateChanged(user => {
@@ -452,7 +479,7 @@ function initializeModalListeners() {
 
 function signInWithGoogle() {
     if (!auth) {
-        alert('Authentication is not available. Check the Firebase configuration.');
+        showToast('Authentication is not available. Check the Firebase configuration.');
         return;
     }
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -460,7 +487,7 @@ function signInWithGoogle() {
         console.error('Google sign-in failed:', err);
         // Quietly ignore the user dismissing the popup.
         if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-            alert('Sign-in failed: ' + (err.message || err.code));
+            showToast('Sign-in failed: ' + (err.message || err.code));
         }
     });
 }
@@ -524,8 +551,12 @@ function updateUserStatus() {
 function updateAuthButtons(signedIn) {
     const signInBtn = document.getElementById('googleSignInBtn');
     const signOutBtn = document.getElementById('signOutBtn');
+    const signedOutPrompt = document.getElementById('signedOutPrompt');
     if (signInBtn) signInBtn.style.display = signedIn ? 'none' : 'inline-flex';
     if (signOutBtn) signOutBtn.style.display = signedIn ? 'inline-flex' : 'none';
+    // Guide signed-out users to sign in instead of leaving an interactive
+    // calendar that just toasts an error on every click.
+    if (signedOutPrompt) signedOutPrompt.style.display = signedIn ? 'none' : 'flex';
 }
 
 // ----- One-time data migration from the legacy name-keyed document -----
@@ -1074,11 +1105,11 @@ function createDayElement(day, year, month) {
 
         const activate = () => {
             if (!currentUser) {
-                alert('Please sign in with Google first');
+                showToast('Please sign in with Google first');
                 return;
             }
             if (whatIfMode && !isFutureOrToday(date)) {
-                alert('What-If mode only lets you set today or future days.');
+                showToast('What-If mode only lets you set today or future days.');
                 return;
             }
             selectedDate = date;
@@ -1136,7 +1167,7 @@ function closeModal() {
 
 function saveLocation(date, location) {
     if (!currentUser) {
-        alert('Please sign in with Google first');
+        showToast('Please sign in with Google first');
         return;
     }
 
@@ -1146,7 +1177,7 @@ function saveLocation(date, location) {
     // What-If mode: store override in-memory only, never persist to Firebase
     if (whatIfMode) {
         if (!isFutureOrToday(date)) {
-            alert('What-If mode only lets you set today or future days.');
+            showToast('What-If mode only lets you set today or future days.');
             return;
         }
         whatIfData[dateStr] = value;
@@ -1168,7 +1199,7 @@ function saveLocation(date, location) {
         })
         .catch(error => {
             console.error('Error saving location:', error);
-            alert('Error saving location. Please try again.');
+            showToast('Error saving location. Please try again.');
         });
 }
 
@@ -1786,7 +1817,7 @@ function initializeStravaButtons() {
     if (connectBtn) {
         connectBtn.addEventListener('click', () => {
             if (!currentUser) {
-                alert('Please sign in with Google first');
+                showToast('Please sign in with Google first');
                 return;
             }
             // Show configuration section instead of opening separate modal
@@ -1818,7 +1849,7 @@ function initializeStravaButtons() {
             const refreshToken = document.getElementById('stravaRefreshTokenInput').value.trim();
             
             if (!token) {
-                alert('Please enter an access token');
+                showToast('Please enter an access token');
                 return;
             }
             
@@ -1875,7 +1906,7 @@ function startStravaOAuth() {
             statusDiv.style.color = '#c62828';
             statusDiv.innerHTML = '❌ Please enter your Client ID';
         } else {
-            alert('Please enter your Client ID');
+            showToast('Please enter your Client ID');
         }
         return;
     }
@@ -1887,7 +1918,7 @@ function startStravaOAuth() {
             statusDiv.style.color = '#c62828';
             statusDiv.innerHTML = '❌ Please enter your Client Secret';
         } else {
-            alert('Please enter your Client Secret');
+            showToast('Please enter your Client Secret');
         }
         return;
     }
@@ -2020,7 +2051,7 @@ async function exchangeStravaCodeForToken(code, clientId, clientSecret) {
             statusDiv.style.color = '#c62828';
             statusDiv.innerHTML = `❌ Error: ${error.message}. Please try again.`;
         } else {
-            alert(`Error exchanging authorization code: ${error.message}`);
+            showToast(`Error exchanging authorization code: ${error.message}`);
         }
     }
 }
@@ -2034,7 +2065,7 @@ function initializeSettingsModal() {
     if (settingsBtn) {
         settingsBtn.addEventListener('click', () => {
             if (!currentUser) {
-                alert('Please sign in with Google first');
+                showToast('Please sign in with Google first');
                 return;
             }
             loadUserGoals();
@@ -2098,31 +2129,31 @@ function saveUserGoals() {
     
     // Validate inputs
     if (officeGoal < 0 || officeGoal > 5) {
-        alert('Office days must be between 0 and 5');
+        showToast('Office days must be between 0 and 5');
         return;
     }
     if (runningGoal < 0 || runningGoal > 7) {
-        alert('Running days must be between 0 and 7');
+        showToast('Running days must be between 0 and 7');
         return;
     }
     if (weightsGoal < 0 || weightsGoal > 7) {
-        alert('Weight training days must be between 0 and 7');
+        showToast('Weight training days must be between 0 and 7');
         return;
     }
     if (coldPlungeGoal < 0 || coldPlungeGoal > 7) {
-        alert('Cold plunge days must be between 0 and 7');
+        showToast('Cold plunge days must be between 0 and 7');
         return;
     }
     if (yogaGoal < 0 || yogaGoal > 7) {
-        alert('Yoga days must be between 0 and 7');
+        showToast('Yoga days must be between 0 and 7');
         return;
     }
     if (hikingGoal < 0 || hikingGoal > 7) {
-        alert('Hiking days must be between 0 and 7');
+        showToast('Hiking days must be between 0 and 7');
         return;
     }
     if (skiGoal < 0 || skiGoal > 7) {
-        alert('Ski days must be between 0 and 7');
+        showToast('Ski days must be between 0 and 7');
         return;
     }
     
@@ -2150,11 +2181,11 @@ function saveUserGoals() {
             })
             .catch(error => {
                 console.error('Error saving goals:', error);
-                alert('Failed to save goals. Please try again.');
+                showToast('Failed to save goals. Please try again.');
             });
     }).catch(error => {
         console.error('Error saving goals:', error);
-        alert('Failed to save goals. Please try again.');
+        showToast('Failed to save goals. Please try again.');
     });
 }
 
@@ -2292,12 +2323,12 @@ async function saveStravaActivitiesToDB(newActivities) {
 
 function saveStravaToken(accessToken, refreshToken) {
     if (!currentUser || !db) {
-        alert('Please sign in with Google first');
+        showToast('Please sign in with Google first');
         return;
     }
     
     if (!accessToken || accessToken.trim() === '') {
-        alert('Please enter a valid access token');
+        showToast('Please enter a valid access token');
         return;
     }
     
@@ -2338,11 +2369,11 @@ function saveStravaToken(accessToken, refreshToken) {
             })
             .catch(error => {
                 console.error('Error saving Strava token:', error);
-                alert('Error saving token. Please try again.');
+                showToast('Error saving token. Please try again.');
             });
     }).catch(error => {
         console.error('Error accessing database:', error);
-        alert('Error accessing database. Please try again.');
+        showToast('Error accessing database. Please try again.');
     });
 }
 
@@ -2376,7 +2407,7 @@ function disconnectStrava(silent = false) {
             .catch(error => {
                 console.error('Error disconnecting Strava:', error);
                 if (!silent) {
-                    alert('Error disconnecting Strava. Please try again.');
+                    showToast('Error disconnecting Strava. Please try again.');
                 }
             });
     });
@@ -2446,7 +2477,7 @@ async function fetchStravaActivities(accessToken, refreshToken) {
             // Token expired or invalid - silently handle by clearing token and showing connect button
             console.log('Strava token expired or invalid - reconnecting required');
             disconnectStrava(true); // Silent disconnect
-            alert('Strava token is invalid or expired. Please reconnect with a valid token.');
+            showToast('Strava token is invalid or expired. Please reconnect with a valid token.');
             return;
         }
         
@@ -2520,7 +2551,7 @@ async function fetchStravaActivities(accessToken, refreshToken) {
     } catch (error) {
         console.error('Error fetching Strava activities:', error);
         // Show alert for errors so user knows what went wrong
-        alert(`Error fetching Strava activities: ${error.message}. Please check your token and try again.`);
+        showToast(`Error fetching Strava activities: ${error.message}. Please check your token and try again.`);
     }
 }
 
@@ -2642,9 +2673,14 @@ function loadStravaWorkout(year, month, day, dayElement) {
             
             const icon = getActivityIcon(activity);
             const activityType = activity.type || 'Run';
+            const label = `${activityType} - ${activity.name || 'Activity'}`;
             workoutIndicator.textContent = icon;
-            workoutIndicator.title = `${activityType} - ${activity.name || 'Activity'}`;
-            
+            workoutIndicator.title = label;
+            // Make the emoji indicator meaningful to screen readers (the emoji
+            // alone announces poorly, and the title tooltip is mouse-only).
+            workoutIndicator.setAttribute('role', 'img');
+            workoutIndicator.setAttribute('aria-label', label);
+
             dayElement.appendChild(workoutIndicator);
         });
     }
