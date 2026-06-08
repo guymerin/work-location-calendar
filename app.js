@@ -1491,8 +1491,12 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                         const activityType = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
                         const activityName = (activity.activityName || activity.name || '').toLowerCase();
                         
-                        // Check for running activities
-                        if (activityType === 'running' || activityType === 'walking' || activityType === 'elliptical' ||
+                        // Check for running activities. Garmin uses distinct
+                        // typeKeys for run variants (running, trail_running,
+                        // treadmill_running, virtual_run, ...), so match any key
+                        // containing "run" rather than the exact word, keeping
+                        // this in sync with getGarminActivityIcon's 🏃 icon.
+                        if (activityType.includes('run') || activityType === 'walking' || activityType === 'elliptical' ||
                             activityName.includes('run') || activityName.includes('jog')) {
                             daysWithRunning.add(dateKey);
                         }
