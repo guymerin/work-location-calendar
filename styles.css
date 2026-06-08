@@ -55,34 +55,26 @@ h1 {
     flex-wrap: wrap;
 }
 
-#userName {
-    padding: 10px 15px;
-    border: 2px solid #e0e0e0;
+.user-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
     border-radius: 8px;
-    font-size: 1rem;
-    transition: border-color 0.3s;
-    width: 150px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #333;
+    max-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-#userName:focus {
-    outline: none;
-    border-color: #667eea;
-}
-
-#setUserName {
-    padding: 10px 20px;
-    background: #667eea;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background 0.3s;
-    font-weight: 500;
-}
-
-#setUserName:hover {
-    background: #5568d3;
+.user-display::before {
+    content: "👤";
+    font-size: 0.95rem;
 }
 
 .google-signin-btn {
@@ -109,13 +101,8 @@ h1 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #4285f4, #ea4335 60%, #fbbc05);
-    color: white;
-    font-weight: 700;
-    font-size: 0.85rem;
+    width: 18px;
+    height: 18px;
 }
 
 .signout-btn {

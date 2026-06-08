@@ -518,13 +518,15 @@ function onSignedOut() {
 }
 
 function updateUserStatus() {
-    const statusDiv = document.getElementById('userStatus');
-    if (!statusDiv) return;
+    const nameEl = document.getElementById('userDisplay');
+    if (!nameEl) return;
     if (currentUser) {
-        statusDiv.textContent = `Signed in as: ${currentUserName}`;
-        statusDiv.style.display = 'block';
+        nameEl.textContent = currentUserName;
+        nameEl.title = `Signed in as ${currentUserName}`;
+        nameEl.style.display = 'inline-flex';
     } else {
-        statusDiv.style.display = 'none';
+        nameEl.textContent = '';
+        nameEl.style.display = 'none';
     }
 }
 
@@ -838,7 +840,12 @@ async function renderCalendar() {
     function createPlaceholderStatsCell() {
         const statsCell = document.createElement('div');
         statsCell.className = 'week-stats-cell';
-        statsCell.innerHTML = '<div class="stat-item"><span class="stat-label">Loading...</span></div>';
+        // Only show "Loading..." while signed in (addWeekStatsCells will fill it
+        // in). When signed out that function early-returns, so a placeholder
+        // would otherwise stay stuck on "Loading..." — leave it empty instead.
+        statsCell.innerHTML = currentUser
+            ? '<div class="stat-item"><span class="stat-label">Loading...</span></div>'
+            : '';
         statsCell.dataset.statsPlaceholder = 'true';
         return statsCell;
     }
