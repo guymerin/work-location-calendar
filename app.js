@@ -1462,7 +1462,10 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                     const activities = stravaActivities[dateKey];
                     
                     activities.forEach(activity => {
-                        if (isRunningActivity(activity)) {
+                        // Count as a run if classified as running OR if it shows
+                        // the 🏃 icon, so the tally can never be lower than the
+                        // number of runner icons displayed for the week.
+                        if (isRunningActivity(activity) || getActivityIcon(activity) === '🏃') {
                             daysWithRunning.add(dateKey);
                         }
                         if (isWeightTrainingActivity(activity)) {
@@ -1491,13 +1494,13 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                         const activityType = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
                         const activityName = (activity.activityName || activity.name || '').toLowerCase();
                         
-                        // Check for running activities. Garmin uses distinct
-                        // typeKeys for run variants (running, trail_running,
-                        // treadmill_running, virtual_run, ...), so match any key
-                        // containing "run" rather than the exact word, keeping
-                        // this in sync with getGarminActivityIcon's 🏃 icon.
+                        // Count as a run for any run-variant typeKey (running,
+                        // trail_running, treadmill_running, virtual_run, ...) or
+                        // if it shows the 🏃 icon, so the tally can never be
+                        // lower than the number of runner icons displayed.
                         if (activityType.includes('run') || activityType === 'walking' || activityType === 'elliptical' ||
-                            activityName.includes('run') || activityName.includes('jog')) {
+                            activityName.includes('run') || activityName.includes('jog') ||
+                            getGarminActivityIcon(activity) === '🏃') {
                             daysWithRunning.add(dateKey);
                         }
                         // Check for weight training
