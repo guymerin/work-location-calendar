@@ -146,6 +146,32 @@
         <div id="userStatus" class="user-status"></div>
     </div>
 
+    <div id="loginModal" class="modal">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+            <span class="close" id="loginModalClose" role="button" tabindex="0" aria-label="Close dialog">&times;</span>
+            <h3 id="loginModalTitle">Log in</h3>
+            <p id="loginModalSubtitle" class="login-subtitle"></p>
+            <form id="loginForm" class="login-form">
+                <label class="login-field" for="loginName">Name</label>
+                <input type="text" id="loginName" autocomplete="username" readonly>
+
+                <label class="login-field" for="loginPassword">Password</label>
+                <div class="password-wrap">
+                    <input type="password" id="loginPassword" autocomplete="current-password">
+                    <button type="button" id="loginPwToggle" class="pw-toggle" aria-label="Show password" aria-pressed="false">👁️</button>
+                </div>
+
+                <div id="loginConfirmField">
+                    <label class="login-field" for="loginConfirm">Confirm password</label>
+                    <input type="password" id="loginConfirm" autocomplete="new-password">
+                </div>
+
+                <p id="loginError" class="login-error" role="alert"></p>
+                <button type="submit" id="loginSubmit" class="login-submit">Log in</button>
+            </form>
+        </div>
+    </div>
+
     <div id="modal" class="modal">
         <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalDate">
             <span class="close" role="button" tabindex="0" aria-label="Close dialog">&times;</span>

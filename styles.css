@@ -85,6 +85,109 @@ h1 {
     background: #5568d3;
 }
 
+/* ----- Login dialog ----- */
+.login-subtitle {
+    margin: 0 0 18px;
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.login-field {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #444;
+    font-size: 0.9rem;
+}
+
+.login-form input[type="text"],
+.login-form input[type="password"] {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+}
+
+.login-form input[type="text"]:focus,
+.login-form input[type="password"]:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.login-form input[readonly] {
+    background: #f5f5f5;
+    color: #666;
+}
+
+.password-wrap {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.password-wrap input {
+    padding-right: 44px !important;
+    margin-bottom: 0 !important; /* spacing lives on .password-wrap instead */
+}
+
+.pw-toggle {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 6px;
+    line-height: 1;
+    border-radius: 6px;
+}
+
+.pw-toggle:focus-visible {
+    outline: 2px solid #667eea;
+    outline-offset: 1px;
+}
+
+.login-error {
+    display: none;
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    background: #ffebee;
+    color: #c62828;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.login-submit {
+    padding: 12px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.login-submit:hover {
+    background: #5568d3;
+}
+
+.login-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .settings-btn {
     padding: 10px 16px;
     background: #f5f5f5;

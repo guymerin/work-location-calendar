@@ -344,6 +344,13 @@ function initializeApp() {
 
     // Event listeners
     document.getElementById('setUserName').addEventListener('click', setUserName);
+    document.getElementById('userName').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            setUserName();
+        }
+    });
+    initializeLoginModal();
     document.getElementById('prevMonth').addEventListener('click', () => changeMonth(-1));
     document.getElementById('nextMonth').addEventListener('click', () => changeMonth(1));
     
@@ -443,12 +450,18 @@ async function hashPassword(name, password) {
         .join('');
 }
 
+// Pending login context, populated by setUserName() and consumed by submitLogin().
+let loginState = { name: '', existingHash: null, mode: 'verify' };
+
+// Entry point from the header "Set Name" button: validate the name, look up the
+// user doc to decide verify-vs-setup, then open the login dialog. All password
+// entry/validation happens in that dialog (no window.prompt/alert chains).
 async function setUserName() {
     const userNameInput = document.getElementById('userName');
     const name = userNameInput.value.trim();
 
     if (!name) {
-        alert('Please enter your name');
+        userNameInput.focus();
         return;
     }
 
@@ -468,43 +481,117 @@ async function setUserName() {
     }
 
     const existingHash = docSnap.exists ? docSnap.data().passwordHash : null;
+    loginState = {
+        name,
+        existingHash,
+        mode: existingHash ? 'verify' : 'setup'
+    };
+    openLoginModal();
+}
 
-    if (existingHash) {
-        // Existing protected user → verify
-        const entered = window.prompt(`Enter password for "${name}":`);
-        if (entered === null) return; // cancelled
-        const enteredHash = await hashPassword(name, entered);
-        if (enteredHash !== existingHash) {
-            alert('Incorrect password.');
-            return;
-        }
+function setLoginError(msg) {
+    const errorEl = document.getElementById('loginError');
+    if (!errorEl) return;
+    errorEl.textContent = msg || '';
+    errorEl.style.display = msg ? 'block' : 'none';
+}
+
+function setPasswordVisible(visible) {
+    const pwInput = document.getElementById('loginPassword');
+    const confirmInput = document.getElementById('loginConfirm');
+    const toggle = document.getElementById('loginPwToggle');
+    const type = visible ? 'text' : 'password';
+    if (pwInput) pwInput.type = type;
+    if (confirmInput) confirmInput.type = type;
+    if (toggle) {
+        toggle.setAttribute('aria-pressed', String(visible));
+        toggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+        toggle.textContent = visible ? '🙈' : '👁️';
+    }
+}
+
+function openLoginModal() {
+    const modal = document.getElementById('loginModal');
+    const title = document.getElementById('loginModalTitle');
+    const subtitle = document.getElementById('loginModalSubtitle');
+    const nameInput = document.getElementById('loginName');
+    const pwInput = document.getElementById('loginPassword');
+    const confirmField = document.getElementById('loginConfirmField');
+    const confirmInput = document.getElementById('loginConfirm');
+    const submitBtn = document.getElementById('loginSubmit');
+
+    nameInput.value = loginState.name;
+    pwInput.value = '';
+    confirmInput.value = '';
+    setLoginError('');
+    setPasswordVisible(false);
+
+    if (loginState.mode === 'verify') {
+        title.textContent = 'Log in';
+        subtitle.textContent = `Enter the password for "${loginState.name}".`;
+        confirmField.style.display = 'none';
+        pwInput.setAttribute('autocomplete', 'current-password');
+        submitBtn.textContent = 'Log in';
     } else {
-        // First-time setup (or pre-existing user without a password) → create one.
-        const msg = docSnap.exists
-            ? `User "${name}" doesn't have a password yet. Set one now:`
-            : `Create a password for new user "${name}":`;
-        const newPwd = window.prompt(msg);
-        if (newPwd === null) return; // cancelled
-        if (!newPwd || newPwd.length < 4) {
-            alert('Password must be at least 4 characters.');
-            return;
-        }
-        const confirmPwd = window.prompt('Confirm password:');
-        if (confirmPwd === null) return;
-        if (confirmPwd !== newPwd) {
-            alert('Passwords do not match.');
-            return;
-        }
-        const newHash = await hashPassword(name, newPwd);
-        try {
-            await db.collection('users').doc(name).set({ passwordHash: newHash }, { merge: true });
-        } catch (err) {
-            console.error('Error saving password:', err);
-            alert('Could not save password. Please try again.');
-            return;
-        }
+        title.textContent = 'Create password';
+        subtitle.textContent = `Set a password for "${loginState.name}" (at least 4 characters).`;
+        confirmField.style.display = 'block';
+        pwInput.setAttribute('autocomplete', 'new-password');
+        submitBtn.textContent = 'Create account';
     }
 
+    modal.style.display = 'block';
+    // The accessible-modal layer focuses the dialog container on open; move focus
+    // to the password field on the next tick so it wins.
+    setTimeout(() => pwInput.focus(), 0);
+}
+
+async function submitLogin(e) {
+    if (e) e.preventDefault();
+    const pwInput = document.getElementById('loginPassword');
+    const confirmInput = document.getElementById('loginConfirm');
+    const submitBtn = document.getElementById('loginSubmit');
+    const pwd = pwInput.value;
+
+    submitBtn.disabled = true;
+    try {
+        if (loginState.mode === 'verify') {
+            const enteredHash = await hashPassword(loginState.name, pwd);
+            if (enteredHash !== loginState.existingHash) {
+                setLoginError('Incorrect password.');
+                pwInput.focus();
+                pwInput.select();
+                return;
+            }
+        } else {
+            if (!pwd || pwd.length < 4) {
+                setLoginError('Password must be at least 4 characters.');
+                pwInput.focus();
+                return;
+            }
+            if (confirmInput.value !== pwd) {
+                setLoginError('Passwords do not match.');
+                confirmInput.focus();
+                return;
+            }
+            const newHash = await hashPassword(loginState.name, pwd);
+            try {
+                await db.collection('users').doc(loginState.name).set({ passwordHash: newHash }, { merge: true });
+            } catch (err) {
+                console.error('Error saving password:', err);
+                setLoginError('Could not save password. Please try again.');
+                return;
+            }
+        }
+
+        document.getElementById('loginModal').style.display = 'none';
+        finishLogin(loginState.name);
+    } finally {
+        submitBtn.disabled = false;
+    }
+}
+
+function finishLogin(name) {
     currentUser = name;
     localStorage.setItem('currentUser', currentUser);
     updateUserStatus();
@@ -517,6 +604,26 @@ async function setUserName() {
 
     renderCalendar(); // This will also update stats
     updateStats(); // Also update stats directly
+}
+
+function initializeLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (!modal) return;
+    const form = document.getElementById('loginForm');
+    const closeBtn = document.getElementById('loginModalClose');
+    const toggle = document.getElementById('loginPwToggle');
+
+    if (form) form.addEventListener('submit', submitLogin);
+    if (closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+    if (toggle) {
+        toggle.addEventListener('click', () => {
+            setPasswordVisible(toggle.getAttribute('aria-pressed') !== 'true');
+        });
+    }
+    // Close on backdrop click.
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    });
 }
 
 function updateUserStatus() {
