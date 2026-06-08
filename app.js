@@ -408,10 +408,7 @@ function initializeApp() {
     
     // Initialize Strava buttons
     initializeStravaButtons();
-    
-    // Initialize Garmin buttons
-    initializeGarminButtons();
-    
+
     // Initialize Settings modal
     initializeSettingsModal();
     
@@ -424,12 +421,7 @@ function initializeApp() {
     if (currentUser) {
         checkStravaConnection();
     }
-    
-    // Load Garmin connection status
-    if (currentUser) {
-        checkGarminConnection();
-    }
-    
+
     // Update stats (even if no user, to show "-")
     updateStats();
 }
@@ -495,7 +487,6 @@ function onSignedIn(user) {
     }
 
     checkStravaConnection();
-    checkGarminConnection();
 
     renderCalendar();
     updateStats();
@@ -601,7 +592,6 @@ async function runMigration(e) {
         clearCurrentUserData();
         subscribeToUserDoc();
         checkStravaConnection();
-        checkGarminConnection();
         renderCalendar();
         updateStats();
     } catch (err) {
@@ -871,10 +861,7 @@ async function renderCalendar() {
         
         // Load Strava workout data
         loadStravaWorkout(prevYear, prevMonth, prevDay, prevDayElement);
-        
-        // Load Garmin workout data
-        loadGarminWorkout(prevYear, prevMonth, prevDay, prevDayElement);
-        
+
         calendarGrid.appendChild(prevDayElement);
         dayElementsAdded++;
         
@@ -899,9 +886,6 @@ async function renderCalendar() {
         
         // Load Strava workout data
         loadStravaWorkout(year, month, day, dayElement);
-        
-        // Load Garmin workout data
-        loadGarminWorkout(year, month, day, dayElement);
 
         calendarGrid.appendChild(dayElement);
         dayElementsAdded++;
@@ -1276,26 +1260,14 @@ function formatDateKey(date) {
 // Helper function to check if an activity is running.
 // Strava's modern `sport_type` distinguishes run variants (Run / TrailRun /
 // VirtualRun) where the legacy `type` may not, so we check both. A name-based
-// fallback mirrors the Garmin counting path and keeps this in sync with
-// getActivityIcon, which shows the 🏃 icon for any run-like activity.
+// fallback keeps this in sync with getActivityIcon, which shows the 🏃 icon
+// for any run-like activity.
 function isRunningActivity(activity) {
     const activityType = activity.sport_type || activity.type || 'Run';
     const activityName = (activity.name || '').toLowerCase();
     return activityType === 'Run' ||
            activityType === 'TrailRun' ||
            activityType === 'VirtualRun' ||
-           activityName.includes('run') ||
-           activityName.includes('jog');
-}
-
-// Garmin equivalent of isRunningActivity. Run-variant typeKeys are running,
-// trail_running, treadmill_running, virtual_run, etc. (all contain "run").
-// Walking and elliptical are deliberately NOT runs (they have their own icons).
-// This is the single source of truth for both the Garmin 🏃 icon and the count.
-function isGarminRunningActivity(activity) {
-    const activityType = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
-    const activityName = (activity.activityName || activity.name || '').toLowerCase();
-    return activityType.includes('run') ||
            activityName.includes('run') ||
            activityName.includes('jog');
 }
@@ -1354,45 +1326,18 @@ function isSkiActivity(activity) {
            activityName.includes('snow shoe');
 }
 
-// Source-agnostic activity classifier: returns the set of health categories an
-// activity belongs to ('running' | 'weights' | 'coldPlunge' | 'yoga' | 'hiking'
-// | 'ski'). This is the single place that decides what each activity "is",
-// replacing the classification logic that used to be duplicated between the
-// Strava helpers above and the inline Garmin checks in addWeekStatsCells.
-// The per-source predicates below are intentionally identical to the originals.
-function getActivityCategories(activity, source) {
+// Activity classifier: returns the set of health categories a Strava activity
+// belongs to ('running' | 'weights' | 'coldPlunge' | 'yoga' | 'hiking' | 'ski').
+// Single place that decides what each activity "is".
+function getActivityCategories(activity) {
     const categories = new Set();
 
-    if (source === 'garmin') {
-        const type = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
-        const name = (activity.activityName || activity.name || '').toLowerCase();
-
-        if (isGarminRunningActivity(activity)) categories.add('running');
-        if (type === 'strength_training' || type === 'weight_training' || type === 'crossfit' ||
-            name.includes('weight') || name.includes('f45') || name.includes('crossfit') || name.includes('gym')) {
-            categories.add('weights');
-        }
-        if ((type === 'workout' && name.includes('plunge')) || name.includes('cold plunge') || name.includes('coldplunge')) {
-            categories.add('coldPlunge');
-        }
-        if (type === 'yoga' || name.includes('yoga') || name.includes('stretching') || name.includes('meditation')) {
-            categories.add('yoga');
-        }
-        if (type === 'hiking' || (type === 'walking' && name.includes('hike')) || name.includes('hiking')) {
-            categories.add('hiking');
-        }
-        if (type === 'skiing' || type === 'alpine_skiing' || type === 'backcountry_skiing' || type === 'nordic_skiing' ||
-            name.includes('ski') || name.includes('snowshoe') || name.includes('snow shoe')) {
-            categories.add('ski');
-        }
-    } else { // strava
-        if (isRunningActivity(activity)) categories.add('running');
-        if (isWeightTrainingActivity(activity)) categories.add('weights');
-        if (isColdPlungeActivity(activity)) categories.add('coldPlunge');
-        if (isYogaActivity(activity)) categories.add('yoga');
-        if (isHikingActivity(activity)) categories.add('hiking');
-        if (isSkiActivity(activity)) categories.add('ski');
-    }
+    if (isRunningActivity(activity)) categories.add('running');
+    if (isWeightTrainingActivity(activity)) categories.add('weights');
+    if (isColdPlungeActivity(activity)) categories.add('coldPlunge');
+    if (isYogaActivity(activity)) categories.add('yoga');
+    if (isHikingActivity(activity)) categories.add('hiking');
+    if (isSkiActivity(activity)) categories.add('ski');
 
     return categories;
 }
@@ -1509,9 +1454,8 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                     officeDays++;
                 }
 
-                // Tally health activities from both sources through the shared
-                // classifier (getActivityCategories), so Strava and Garmin stay
-                // in sync by construction — one place decides what each activity is.
+                // Tally health activities through the shared classifier
+                // (getActivityCategories) — one place decides what each activity is.
                 const categorySets = {
                     running: daysWithRunning,
                     weights: daysWithWeightTraining,
@@ -1520,11 +1464,9 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                     hiking: daysWithHiking,
                     ski: daysWithSki
                 };
-                const tallyActivity = (activity, source) => {
-                    getActivityCategories(activity, source).forEach(cat => categorySets[cat].add(dateKey));
-                };
-                (stravaActivities[dateKey] || []).forEach(a => tallyActivity(a, 'strava'));
-                (garminActivities[dateKey] || []).forEach(a => tallyActivity(a, 'garmin'));
+                (stravaActivities[dateKey] || []).forEach(activity => {
+                    getActivityCategories(activity).forEach(cat => categorySets[cat].add(dateKey));
+                });
             });
             
             // Only show stats if the week has started AND not all days are from next month
@@ -2097,7 +2039,6 @@ function initializeSettingsModal() {
             }
             loadUserGoals();
             checkStravaConnection(); // Update Strava button status when opening settings
-            checkGarminConnection(); // Update Garmin button status when opening settings
             settingsModal.style.display = 'block';
         });
     }
@@ -2708,673 +2649,3 @@ function loadStravaWorkout(year, month, day, dayElement) {
         });
     }
 }
-
-// ==================== GARMIN INTEGRATION ====================
-
-let garminActivities = {}; // Cache of activities by date (YYYY-MM-DD)
-
-function initializeGarminButtons() {
-    const connectBtn = document.getElementById('garminConnectBtn');
-    const disconnectBtn = document.getElementById('garminDisconnectBtn');
-    const configSection = document.getElementById('garminConfigSection');
-    const saveTokenBtn = document.getElementById('garminSaveToken');
-    const cancelConfigBtn = document.getElementById('garminCancelConfig');
-    
-    if (connectBtn) {
-        connectBtn.addEventListener('click', () => {
-            if (!currentUser) {
-                alert('Please sign in with Google first');
-                return;
-            }
-            // Show configuration section
-            if (configSection) {
-                configSection.style.display = 'block';
-                configSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        });
-    }
-    
-    if (disconnectBtn) {
-        disconnectBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to disconnect Garmin?')) {
-                disconnectGarmin();
-            }
-        });
-    }
-    
-    // Handle Save Token button
-    if (saveTokenBtn) {
-        saveTokenBtn.addEventListener('click', () => {
-            const sessionToken = document.getElementById('garminSessionToken').value.trim();
-            if (!sessionToken) {
-                alert('Please enter a session token');
-                return;
-            }
-            saveGarminToken(sessionToken);
-        });
-    }
-    
-    // Handle Cancel button
-    if (cancelConfigBtn) {
-        cancelConfigBtn.addEventListener('click', () => {
-            if (configSection) {
-                configSection.style.display = 'none';
-                // Clear form fields
-                document.getElementById('garminEmail').value = '';
-                document.getElementById('garminPassword').value = '';
-                document.getElementById('garminSessionToken').value = '';
-                const statusDiv = document.getElementById('garminAuthStatus');
-                if (statusDiv) {
-                    statusDiv.style.display = 'none';
-                    statusDiv.innerHTML = '';
-                }
-            }
-        });
-    }
-}
-
-
-function checkGarminConnection() {
-    if (!currentUser || !db) {
-        const connectBtn = document.getElementById('garminConnectBtn');
-        const disconnectBtn = document.getElementById('garminDisconnectBtn');
-        if (connectBtn) connectBtn.style.display = 'none';
-        if (disconnectBtn) disconnectBtn.style.display = 'none';
-        return;
-    }
-    
-    db.collection('users').doc(currentUser).get().then(doc => {
-        if (doc.exists) {
-            const data = doc.data();
-            const hasToken = data.garminSessionToken && data.garminSessionToken.trim() !== '';
-            
-            console.log('Checking Garmin connection - hasToken:', hasToken);
-            
-            const connectBtn = document.getElementById('garminConnectBtn');
-            const disconnectBtn = document.getElementById('garminDisconnectBtn');
-            
-            if (connectBtn) {
-                connectBtn.style.display = hasToken ? 'none' : 'inline-flex';
-            }
-            if (disconnectBtn) {
-                disconnectBtn.style.display = hasToken ? 'inline-flex' : 'none';
-            }
-            
-            if (hasToken) {
-                // Load existing activities from database first
-                loadGarminActivitiesFromDB().then(() => {
-                    console.log('Loaded activities from database, now syncing new ones...');
-                    // Then fetch new activities from Garmin API
-                    fetchGarminActivities(data.garminSessionToken);
-                }).catch(error => {
-                    console.error('Error loading activities from database:', error);
-                    // Still try to fetch from API
-                    fetchGarminActivities(data.garminSessionToken);
-                });
-            } else {
-                console.log('No token found');
-            }
-        } else {
-            console.log('No user document found');
-            const connectBtn = document.getElementById('garminConnectBtn');
-            const disconnectBtn = document.getElementById('garminDisconnectBtn');
-            if (connectBtn) connectBtn.style.display = 'inline-flex';
-            if (disconnectBtn) disconnectBtn.style.display = 'none';
-        }
-    }).catch(error => {
-        console.error('Error checking Garmin connection:', error);
-    });
-}
-
-// Load Garmin activities from Firestore
-async function loadGarminActivitiesFromDB() {
-    if (!currentUser || !db) {
-        return Promise.resolve();
-    }
-    
-    try {
-        const userDoc = await db.collection('users').doc(currentUser).get();
-        if (userDoc.exists) {
-            const data = userDoc.data();
-            const storedActivities = data.garminActivities || {};
-            
-            // Convert stored activities back to the garminActivities format
-            garminActivities = {};
-            Object.keys(storedActivities).forEach(dateKey => {
-                garminActivities[dateKey] = storedActivities[dateKey];
-            });
-            
-            console.log(`Loaded ${Object.keys(garminActivities).length} days with activities from database`);
-            
-            // Update calendar to show loaded activities
-            renderCalendar();
-        }
-    } catch (error) {
-        console.error('Error loading Garmin activities from database:', error);
-        throw error;
-    }
-}
-
-// Save Garmin activities to Firestore
-async function saveGarminActivitiesToDB(newActivities) {
-    if (!currentUser || !db) {
-        return;
-    }
-    
-    try {
-        const userDocRef = db.collection('users').doc(currentUser);
-        const userDoc = await userDocRef.get();
-        
-        const existingData = userDoc.exists ? userDoc.data() : {};
-        const existingActivities = existingData.garminActivities || {};
-        
-        // Merge new activities with existing ones
-        const mergedActivities = { ...existingActivities };
-        
-        Object.keys(newActivities).forEach(dateKey => {
-            if (!mergedActivities[dateKey]) {
-                mergedActivities[dateKey] = [];
-            }
-            
-            // Get existing activity IDs for this date
-            const existingIds = new Set(mergedActivities[dateKey].map(a => a.activityId || a.id));
-            
-            // Add new activities that don't already exist
-            newActivities[dateKey].forEach(activity => {
-                const activityId = activity.activityId || activity.id;
-                if (!existingIds.has(activityId)) {
-                    mergedActivities[dateKey].push(activity);
-                }
-            });
-        });
-        
-        // Preserve all existing data (including home office data) when updating
-        // Get all existing fields to preserve them
-        const updatedData = { ...existingData };
-        updatedData.garminActivities = mergedActivities;
-        
-        // Update the document with merged activities while preserving all other data
-        await userDocRef.set(updatedData, { merge: true });
-        
-        console.log('Saved Garmin activities to database');
-        
-        // Update in-memory cache
-        garminActivities = mergedActivities;
-        
-    } catch (error) {
-        console.error('Error saving Garmin activities to database:', error);
-        throw error;
-    }
-}
-
-function saveGarminToken(sessionToken) {
-    if (!currentUser || !db) {
-        alert('Please sign in with Google first');
-        return;
-    }
-    
-    if (!sessionToken || sessionToken.trim() === '') {
-        alert('Please enter a valid session token');
-        return;
-    }
-    
-    const statusDiv = document.getElementById('garminAuthStatus');
-    
-    // Show status
-    if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.style.background = '#e3f2fd';
-        statusDiv.style.color = '#1565c0';
-        statusDiv.innerHTML = '⏳ Saving token and testing connection...';
-    }
-    
-    const userDocRef = db.collection('users').doc(currentUser);
-    
-    userDocRef.get().then(doc => {
-        const data = doc.exists ? doc.data() : {};
-        data.garminSessionToken = sessionToken.trim();
-        
-        userDocRef.set(data, { merge: true })
-            .then(() => {
-                console.log('Garmin token saved successfully');
-                
-                // Update UI immediately
-                document.getElementById('garminConnectBtn').style.display = 'none';
-                document.getElementById('garminDisconnectBtn').style.display = 'inline-flex';
-                
-                // Show success
-                if (statusDiv) {
-                    statusDiv.style.display = 'block';
-                    statusDiv.style.background = '#e8f5e9';
-                    statusDiv.style.color = '#2e7d32';
-                    statusDiv.innerHTML = '✅ Token saved! Importing all Garmin activities...';
-                }
-                
-                // Load existing activities from database first, then fetch new ones
-                loadGarminActivitiesFromDB().then(() => {
-                    // Fetch new activities from Garmin API
-                    fetchGarminActivities(sessionToken.trim());
-                }).catch(error => {
-                    console.error('Error loading activities from database:', error);
-                    // Still try to fetch from API
-                    fetchGarminActivities(sessionToken.trim());
-                });
-                
-                // Hide config section after a short delay
-                setTimeout(() => {
-                    const configSection = document.getElementById('garminConfigSection');
-                    if (configSection) {
-                        configSection.style.display = 'none';
-                        // Clear form fields
-                        document.getElementById('garminEmail').value = '';
-                        document.getElementById('garminPassword').value = '';
-                        document.getElementById('garminSessionToken').value = '';
-                        if (statusDiv) {
-                            statusDiv.style.display = 'none';
-                            statusDiv.innerHTML = '';
-                        }
-                    }
-                }, 3000);
-                
-                // Also check connection to ensure consistency
-                setTimeout(() => {
-                    checkGarminConnection();
-                }, 500);
-            })
-            .catch(error => {
-                console.error('Error saving Garmin token:', error);
-                if (statusDiv) {
-                    statusDiv.style.display = 'block';
-                    statusDiv.style.background = '#ffebee';
-                    statusDiv.style.color = '#c62828';
-                    statusDiv.innerHTML = '❌ Error saving token. Please try again.';
-                } else {
-                    alert('Error saving token. Please try again.');
-                }
-            });
-    }).catch(error => {
-        console.error('Error accessing database:', error);
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = '❌ Error accessing database. Please try again.';
-        } else {
-            alert('Error accessing database. Please try again.');
-        }
-    });
-}
-
-function disconnectGarmin(silent = false) {
-    if (!currentUser || !db) return;
-    
-    const userDocRef = db.collection('users').doc(currentUser);
-    
-    userDocRef.get().then(doc => {
-        const data = doc.exists ? doc.data() : {};
-        data.garminSessionToken = null;
-        data.garminActivities = null; // Clear activities from database
-        
-        userDocRef.set(data, { merge: true })
-            .then(() => {
-                garminActivities = {};
-                checkGarminConnection();
-                renderCalendar();
-                if (!silent) {
-                    console.log('Garmin disconnected');
-                }
-            })
-            .catch(error => {
-                console.error('Error disconnecting Garmin:', error);
-                if (!silent) {
-                    alert('Error disconnecting Garmin. Please try again.');
-                }
-            });
-    });
-}
-
-// Helper function to fetch a single page of Garmin activities
-async function fetchGarminActivitiesPage(sessionToken, startTimestamp, limit = 200) {
-    const response = await fetch(`https://connectapi.garmin.com/activitylist-service/activities/search/activities?start=${startTimestamp}&limit=${limit}`, {
-        method: 'GET',
-        headers: {
-            'Cookie': `SESSIONID=${sessionToken.trim()}`,
-            'Accept': 'application/json',
-            'Referer': 'https://connect.garmin.com/'
-        },
-        credentials: 'include'
-    });
-    
-    if (response.status === 401 || response.status === 403) {
-        // Token expired or invalid
-        console.log('Garmin token expired or invalid - reconnecting required');
-        disconnectGarmin(true); // Silent disconnect
-        throw new Error('Garmin session token is invalid or expired. Please run the Python script again to get a new token.');
-    }
-    
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Garmin API error:', response.status, errorText);
-        
-        // If CORS error, provide helpful message
-        if (response.status === 0 || errorText.includes('CORS')) {
-            throw new Error('CORS error: Garmin API cannot be accessed directly from browser. You may need a backend proxy service.');
-        }
-        
-        throw new Error(`Garmin API error: ${response.status} - ${errorText}`);
-    }
-    
-    return await response.json();
-}
-
-async function fetchGarminActivities(sessionToken) {
-    if (!sessionToken || sessionToken.trim() === '') {
-        console.log('No session token provided');
-        return;
-    }
-    
-    try {
-        // Get existing activities to find the latest timestamp
-        let latestActivityTimestamp = 0;
-        let earliestActivityTimestamp = Infinity;
-        const existingActivityIds = new Set();
-        
-        // Find the latest and earliest activity timestamps from existing activities
-        Object.keys(garminActivities).forEach(dateKey => {
-            garminActivities[dateKey].forEach(activity => {
-                const activityId = activity.activityId || activity.id;
-                existingActivityIds.add(activityId);
-                // Use startTimeGMT if available, otherwise parse startTimeLocal
-                let timestamp = 0;
-                if (activity.startTimeGMT) {
-                    timestamp = new Date(activity.startTimeGMT).getTime() / 1000;
-                } else if (activity.startTimeLocal) {
-                    timestamp = new Date(activity.startTimeLocal).getTime() / 1000;
-                }
-                
-                if (timestamp > 0) {
-                    if (timestamp > latestActivityTimestamp) {
-                        latestActivityTimestamp = timestamp;
-                    }
-                    if (timestamp < earliestActivityTimestamp) {
-                        earliestActivityTimestamp = timestamp;
-                    }
-                }
-            });
-        });
-        
-        const now = new Date();
-        const nextMonth = new Date(now);
-        nextMonth.setMonth(now.getMonth() + 1);
-        const before = Math.floor(nextMonth.getTime() / 1000);
-        
-        // Determine if this is the first import (no existing activities)
-        const isFirstImport = latestActivityTimestamp === 0;
-        
-        let after;
-        let shouldFetchAll = false;
-        
-        if (isFirstImport) {
-            // First time fetching - import ALL historical data
-            // Go back 10 years to get all activities (adjust if needed)
-            const tenYearsAgo = new Date(now);
-            tenYearsAgo.setFullYear(now.getFullYear() - 10);
-            after = Math.floor(tenYearsAgo.getTime() / 1000);
-            shouldFetchAll = true;
-            console.log('First time importing Garmin data - fetching ALL historical activities (last 10 years)');
-        } else {
-            // Fetch activities after the latest one we have (subtract 1 day to be safe)
-            after = latestActivityTimestamp - 86400; // 1 day in seconds
-            console.log(`Fetching new Garmin activities after timestamp: ${after} (${new Date(after * 1000).toISOString()})`);
-        }
-        
-        // Fetch activities with pagination
-        let allActivities = [];
-        let currentStart = after;
-        let hasMore = true;
-        const limit = 200;
-        let pageCount = 0;
-        const maxPages = shouldFetchAll ? 100 : 10; // Limit pages to avoid infinite loops
-        
-        while (hasMore && pageCount < maxPages) {
-            pageCount++;
-            console.log(`Fetching Garmin activities page ${pageCount} (start: ${currentStart}, ${new Date(currentStart * 1000).toISOString()})`);
-            
-            const activities = await fetchGarminActivitiesPage(sessionToken, currentStart, limit);
-            
-            if (activities.length === 0) {
-                hasMore = false;
-                break;
-            }
-            
-            allActivities = allActivities.concat(activities);
-            console.log(`Fetched ${activities.length} activities (total so far: ${allActivities.length})`);
-            
-            // If we got fewer than the limit, we've reached the end
-            if (activities.length < limit) {
-                hasMore = false;
-            } else {
-                // For next page, use the timestamp of the last activity (oldest in this batch)
-                // Activities are typically returned in reverse chronological order (newest first)
-                const lastActivity = activities[activities.length - 1];
-                let lastTimestamp = 0;
-                if (lastActivity.startTimeGMT) {
-                    lastTimestamp = new Date(lastActivity.startTimeGMT).getTime() / 1000;
-                } else if (lastActivity.startTimeLocal) {
-                    lastTimestamp = new Date(lastActivity.startTimeLocal).getTime() / 1000;
-                } else if (lastActivity.beginTimestamp) {
-                    lastTimestamp = lastActivity.beginTimestamp;
-                }
-                
-                // Check if we've reached the current time (for full import)
-                if (shouldFetchAll && lastTimestamp >= before) {
-                    hasMore = false;
-                    console.log('Reached current time, stopping import');
-                } else if (lastTimestamp > 0 && lastTimestamp > currentStart) {
-                    // Use the last activity's timestamp + 1 second as the next start
-                    // This ensures we don't miss any activities and don't get duplicates
-                    currentStart = lastTimestamp + 1;
-                } else {
-                    // No valid timestamp found or timestamp didn't advance - stop fetching
-                    hasMore = false;
-                    console.log('No more activities to fetch or timestamp did not advance');
-                }
-            }
-            
-            // Add a small delay to avoid rate limiting
-            if (hasMore) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-        }
-        
-        console.log(`Fetched ${allActivities.length} total Garmin activities from API`);
-        
-        // Filter out activities we already have
-        const newActivities = allActivities.filter(activity => {
-            const activityId = activity.activityId || activity.id;
-            return !existingActivityIds.has(activityId);
-        });
-        console.log(`${newActivities.length} new activities (${allActivities.length - newActivities.length} already exist)`);
-        
-        if (newActivities.length === 0) {
-            console.log('No new activities to sync');
-            renderCalendar();
-            return;
-        }
-        
-        // Group new activities by date
-        const newActivitiesByDate = {};
-        newActivities.forEach(activity => {
-            // Parse startTimeLocal or startTimeGMT
-            const dateString = activity.startTimeLocal || activity.startTimeGMT || activity.beginTimestamp;
-            
-            // Parse the date string
-            const dateMatch = dateString ? dateString.match(/^(\d{4})-(\d{2})-(\d{2})/) : null;
-            
-            if (dateMatch) {
-                const year = dateMatch[1];
-                const month = dateMatch[2];
-                const day = dateMatch[3];
-                const dateKey = `${year}-${month}-${day}`;
-                
-                if (!newActivitiesByDate[dateKey]) {
-                    newActivitiesByDate[dateKey] = [];
-                }
-                newActivitiesByDate[dateKey].push(activity);
-            } else {
-                // Fallback to old method if string format is unexpected
-                console.warn('Unexpected date format:', dateString);
-                const activityDate = dateString ? new Date(dateString) : new Date(activity.beginTimestamp * 1000);
-                const year = activityDate.getFullYear();
-                const month = activityDate.getMonth();
-                const day = activityDate.getDate();
-                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                
-                if (!newActivitiesByDate[dateKey]) {
-                    newActivitiesByDate[dateKey] = [];
-                }
-                newActivitiesByDate[dateKey].push(activity);
-            }
-        });
-        
-        // Save new activities to database (this will preserve home office data)
-        await saveGarminActivitiesToDB(newActivitiesByDate);
-        
-        console.log('New activities grouped by date:', Object.keys(newActivitiesByDate).length, 'days with new activities');
-        
-        // Update calendar to show workout icons
-        renderCalendar();
-        
-        // Show success message for first import
-        if (isFirstImport && newActivities.length > 0) {
-            const statusDiv = document.getElementById('garminAuthStatus');
-            if (statusDiv) {
-                statusDiv.style.display = 'block';
-                statusDiv.style.background = '#e8f5e9';
-                statusDiv.style.color = '#2e7d32';
-                statusDiv.innerHTML = `✅ Successfully imported ${newActivities.length} Garmin activities!`;
-            }
-        }
-        
-    } catch (error) {
-        console.error('Error fetching Garmin activities:', error);
-        
-        // Show helpful error message
-        const errorMsg = error.message.includes('CORS') 
-            ? 'Garmin API cannot be accessed directly from browser due to CORS restrictions. You may need to set up a backend proxy service that uses the garminconnect Python library.'
-            : `Error fetching Garmin activities: ${error.message}. Please check your token and try again.`;
-        
-        alert(errorMsg);
-        
-        // Update status div if it exists
-        const statusDiv = document.getElementById('garminAuthStatus');
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = `❌ ${errorMsg}`;
-        }
-    }
-}
-
-// Load Garmin workout data for a specific day
-function loadGarminWorkout(year, month, day, dayElement) {
-    const date = new Date(year, month, day);
-    const dateKey = formatDateKey(date);
-    
-    // Get existing workout indicators (we'll add Garmin activities alongside Strava)
-    const existingIndicators = dayElement.querySelectorAll('.workout-indicator');
-    let indicatorCount = existingIndicators.length;
-    
-    if (garminActivities[dateKey] && garminActivities[dateKey].length > 0) {
-        const activities = garminActivities[dateKey];
-        
-        // Create one indicator per activity
-        activities.forEach((activity, index) => {
-            const workoutIndicator = document.createElement('div');
-            workoutIndicator.className = 'workout-indicator';
-            
-            // Position indicators: continue from where Strava indicators left off
-            const positions = [
-                { top: '2px', right: '2px', left: 'auto' }, // top-right
-                { top: '2px', left: '2px', right: 'auto' },  // top-left
-                { top: 'auto', right: '2px', bottom: '2px', left: 'auto' }, // bottom-right
-                { top: 'auto', left: '2px', bottom: '2px', right: 'auto' }   // bottom-left
-            ];
-            const position = positions[Math.min((indicatorCount + index) % 4, positions.length - 1)];
-            
-            Object.assign(workoutIndicator.style, {
-                position: 'absolute',
-                top: position.top || 'auto',
-                right: position.right || 'auto',
-                left: position.left || 'auto',
-                bottom: position.bottom || 'auto',
-                fontSize: '0.85rem',
-                background: 'rgba(0, 124, 195, 0.9)', // Garmin blue
-                borderRadius: '50%',
-                width: '18px',
-                height: '18px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                zIndex: '5',
-                cursor: 'help'
-            });
-            
-            const icon = getGarminActivityIcon(activity);
-            const activityType = activity.activityType?.typeKey || activity.type || 'running';
-            workoutIndicator.textContent = icon;
-            workoutIndicator.title = `${activityType} - ${activity.activityName || activity.name || 'Activity'}`;
-            
-            dayElement.appendChild(workoutIndicator);
-        });
-    }
-}
-
-// Helper function to get icon for a Garmin activity
-function getGarminActivityIcon(activity) {
-    const activityType = (activity.activityType?.typeKey || activity.type || 'running').toLowerCase();
-    const activityName = (activity.activityName || activity.name || '').toLowerCase();
-
-    // Running is the single source of truth (see isGarminRunningActivity): only
-    // true runs show 🏃, matching the weekly running-day count by construction.
-    if (isGarminRunningActivity(activity)) return '🏃';
-
-    // Map Garmin activity types to icons (similar to Strava)
-    const typeIcons = {
-        'running': '🏃',
-        'cycling': '🚴',
-        'walking': '🚶',
-        'swimming': '🏊',
-        'hiking': '🥾',
-        'yoga': '🧘',
-        'strength_training': '🏋️',
-        'weight_training': '🏋️',
-        'crossfit': '🏋️',
-        'rowing': '🚣',
-        'indoor_rowing': '🚣'
-    };
-    
-    // Check for cold plunge keywords
-    if ((activityType === 'workout' && activityName.includes('plunge')) ||
-        activityName.includes('cold plunge') ||
-        activityName.includes('coldplunge')) {
-        return '🧊';
-    }
-    
-    // Check for yoga keywords
-    if (activityName.includes('yoga') || activityName.includes('stretching') || activityName.includes('meditation')) {
-        return '🧘';
-    }
-    
-    // Check for weight training keywords
-    if (activityName.includes('weight') || activityName.includes('f45') || activityName.includes('crossfit') || activityName.includes('gym')) {
-        return '🏋️';
-    }
-    
-    // Neutral fallback (🏅) for unrecognized activities (incl. walking/elliptical
-    // and anything new) — never 🏃, so non-runs are never miscounted.
-    return typeIcons[activityType] || '🏅';
-}
-
