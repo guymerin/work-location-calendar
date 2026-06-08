@@ -2587,17 +2587,21 @@ function getActivityIcon(activity) {
                       activityName.includes('snow shoe') ||
                       activityType === 'Snowshoe';
     
-    // Check if activity is a water sport (standup paddling, kayaking, etc.)
-    const isWaterSport = activityName.includes('paddling') || 
+    // Check if activity is a water/rowing sport (rowing, standup paddling, kayaking, etc.)
+    const isWaterSport = activityName.includes('paddling') ||
                         activityName.includes('paddle') ||
                         activityName.includes('sup') ||
                         activityName.includes('stand up') ||
                         activityName.includes('kayak') ||
                         activityName.includes('canoe') ||
+                        activityName.includes('rowing') ||
+                        activityName.includes('rower') ||
+                        activityName.includes('erg') ||
                         activityType === 'WaterSport' ||
                         activityType === 'Kayaking' ||
                         activityType === 'Canoeing' ||
-                        activityType === 'StandUpPaddling';
+                        activityType === 'StandUpPaddling' ||
+                        activityType === 'Rowing';
     
     // Map activity types to icons
     const typeIcons = {
@@ -2610,6 +2614,7 @@ function getActivityIcon(activity) {
         'Yoga': '🧘',
         'Snowshoe': '🎿',
         'WaterSport': '🚣', // Standup paddle icon (rowing/paddling)
+        'Rowing': '🚣',
         'Kayaking': '🚣',
         'Canoeing': '🚣',
         'StandUpPaddling': '🚣',
