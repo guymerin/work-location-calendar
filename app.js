@@ -1276,10 +1276,19 @@ function formatDateKey(date) {
     return `${year}-${month}-${day}`;
 }
 
-// Helper function to check if an activity is running
+// Helper function to check if an activity is running.
+// Strava's modern `sport_type` distinguishes run variants (Run / TrailRun /
+// VirtualRun) where the legacy `type` may not, so we check both. A name-based
+// fallback mirrors the Garmin counting path and keeps this in sync with
+// getActivityIcon, which shows the 🏃 icon for any run-like activity.
 function isRunningActivity(activity) {
-    const activityType = activity.type || 'Run';
-    return activityType === 'Run' || activityType === 'VirtualRun';
+    const activityType = activity.sport_type || activity.type || 'Run';
+    const activityName = (activity.name || '').toLowerCase();
+    return activityType === 'Run' ||
+           activityType === 'TrailRun' ||
+           activityType === 'VirtualRun' ||
+           activityName.includes('run') ||
+           activityName.includes('jog');
 }
 
 // Helper function to check if an activity is weight training
