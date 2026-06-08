@@ -382,8 +382,6 @@ function initializeApp() {
     // Authentication
     document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
     document.getElementById('signOutBtn').addEventListener('click', signOutUser);
-    const promptSignInBtn = document.getElementById('promptSignInBtn');
-    if (promptSignInBtn) promptSignInBtn.addEventListener('click', signInWithGoogle);
     initializeMigrateModal();
     if (auth) {
         auth.onAuthStateChanged(user => {
