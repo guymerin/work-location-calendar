@@ -1,0 +1,14 @@
+{
+  "name": "work-location-calendar-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless smoke tests for the Work Location Calendar (mocked Firebase, never touches real data).",
+  "scripts": {
+    "test": "node modal.test.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
+}

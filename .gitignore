@@ -15,3 +15,8 @@ Thumbs.db
 *.swo
 *~
 
+# Test harness
+test/node_modules/
+test/screenshots/
+test/package-lock.json
+
