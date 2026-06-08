@@ -888,7 +888,8 @@ function createDayElement(day, year, month) {
     dayDiv.className = 'calendar-day';
     
     if (day !== null) {
-        const dow = new Date(year, month, day).getDay();
+        const date = new Date(year, month, day);
+        const dow = date.getDay();
         if (dow === 0 || dow === 6) {
             dayDiv.classList.add('weekend-cell');
         }
@@ -896,23 +897,39 @@ function createDayElement(day, year, month) {
             <div class="day-number">${day}</div>
             <div class="location-indicator" data-location="none"></div>
         `;
-        
-        dayDiv.addEventListener('click', () => {
+
+        // Make the cell a real, keyboard-operable control so it can be reached
+        // and activated without a mouse. The label is filled in with the current
+        // status by updateDayElement once data loads.
+        dayDiv.setAttribute('role', 'button');
+        dayDiv.setAttribute('tabindex', '0');
+        const fullDate = date.toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+        dayDiv.setAttribute('aria-label', `${fullDate}, no location set`);
+
+        const activate = () => {
             if (!currentUser) {
                 alert('Please enter your name first');
                 return;
             }
-            
-            const date = new Date(year, month, day);
             if (whatIfMode && !isFutureOrToday(date)) {
                 alert('What-If mode only lets you set today or future days.');
                 return;
             }
             selectedDate = date;
             openModal(selectedDate);
+        };
+
+        dayDiv.addEventListener('click', activate);
+        dayDiv.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                activate();
+            }
         });
     }
-    
+
     return dayDiv;
 }
 
@@ -1040,19 +1057,32 @@ function loadLocationForDate(date) {
 
 function updateDayElement(dayElement, location) {
     const indicator = dayElement.querySelector('.location-indicator');
-    
+
+    let statusText;
     if (location === 'home') {
         indicator.className = 'location-indicator home';
         indicator.textContent = '🏠';
+        statusText = 'working from home';
     } else if (location === 'office') {
         indicator.className = 'location-indicator office';
         indicator.textContent = '🏢';
+        statusText = 'working from office';
     } else if (location === 'nonworkday') {
         indicator.className = 'location-indicator nonworkday';
         indicator.textContent = '🌴';
+        statusText = 'non-work day';
     } else {
         indicator.className = 'location-indicator';
         indicator.textContent = '';
+        statusText = 'no location set';
+    }
+
+    // Keep the accessible label's status in sync with the visual indicator,
+    // preserving the date portion set in createDayElement.
+    const existing = dayElement.getAttribute('aria-label');
+    if (existing) {
+        const datePart = existing.split(',').slice(0, -1).join(',');
+        dayElement.setAttribute('aria-label', `${datePart}, ${statusText}`);
     }
 }
 
@@ -1163,7 +1193,6 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
             const weekDays = weekChildren.filter(child => child.classList.contains('calendar-day'));
             
             let officeDays = 0;
-            let homeDays = 0;
             const daysWithRunning = new Set();
             const daysWithWeightTraining = new Set();
             const daysWithColdPlunge = new Set();
@@ -1226,17 +1255,16 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                 const dateKey = formatDateKey(date);
                 
                 // Check office location
-                const explicitLocation = locationData[dateKey];
-                const dayOfWeek = date.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                const location = explicitLocation || (isWeekend ? 'home' : 'none');
+                // Only explicitly-marked days count toward the weekly stats.
+                // Unmarked days (including weekends) contribute nothing, matching
+                // computeWorkStats / updateMonthlyStatus / updateYearToDateStatus,
+                // which all ignore unmarked weekends rather than defaulting them.
+                const location = locationData[dateKey] || 'none';
                 
                 if (location === 'office') {
                     officeDays++;
-                } else if (location === 'home') {
-                    homeDays++;
                 }
-                
+
                 // Check Strava activities
                 if (stravaActivities[dateKey] && stravaActivities[dateKey].length > 0) {
                     const activities = stravaActivities[dateKey];

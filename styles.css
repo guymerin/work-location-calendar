@@ -649,6 +649,12 @@ h1 {
     border-color: #667eea;
 }
 
+.calendar-day:focus-visible {
+    outline: 3px solid #667eea;
+    outline-offset: 2px;
+    border-color: #667eea;
+}
+
 .calendar-day.other-month {
     opacity: 0.3;
     background: #f9f9f9;
