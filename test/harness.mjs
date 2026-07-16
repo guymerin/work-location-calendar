@@ -94,6 +94,26 @@ export async function runChecks(browser, { contextOptions = {}, label, prefix, k
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
 
+  // The seeded data is built around a fixed "today" (June 8 2026, see
+  // buildMockDoc) and the checks click "June 10, 2026", so shift the app's
+  // clock to that date by a constant offset. Only Date is faked — timers
+  // keep running on real time.
+  const FAKE_NOW = new Date(2026, 5, 8, 12, 0, 0).getTime();
+  await page.addInitScript(fakeNow => {
+    const RealDate = Date;
+    const offset = fakeNow - RealDate.now();
+    class ShiftedDate extends RealDate {
+      constructor(...args) {
+        if (args.length === 0) super(RealDate.now() + offset);
+        else super(...args);
+      }
+      static now() { return RealDate.now() + offset; }
+    }
+    ShiftedDate.parse = RealDate.parse;
+    ShiftedDate.UTC = RealDate.UTC;
+    window.Date = ShiftedDate;
+  }, FAKE_NOW);
+
   await page.addInitScript(({ doc, user, uid }) => {
     window.__MOCK_FIRESTORE__ = { ['users/' + uid]: doc };
     window.__MOCK_USER__ = user;

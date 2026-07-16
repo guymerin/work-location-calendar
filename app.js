@@ -274,109 +274,16 @@ function handleStravaOAuthCallback() {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const error = urlParams.get('error');
-    
+
     if (error) {
         console.error('Strava OAuth error:', error);
-        // Show error in settings modal if it's open
-        const statusDiv = document.getElementById('stravaAuthStatus');
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.textContent = `❌ Authorization failed: ${error}`;
-        } else {
         showToast(`Strava authorization failed: ${error}`);
-        }
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
     }
-    
+
     if (code) {
-        // Try to automatically exchange code for token using stored credentials
-        const storedClientId = sessionStorage.getItem('stravaClientId');
-        const storedClientSecret = sessionStorage.getItem('stravaClientSecret');
-        
-        if (storedClientId && storedClientSecret) {
-            // Open settings modal if not already open to show status
-            const settingsModal = document.getElementById('settingsModal');
-            const configSection = document.getElementById('stravaConfigSection');
-            if (settingsModal && configSection) {
-                settingsModal.style.display = 'block';
-                configSection.style.display = 'block';
-            }
-            // Automatically exchange code for token
-            exchangeStravaCodeForToken(code, storedClientId, storedClientSecret);
-        } else {
-            // Fallback to old manual method if credentials not stored
-        const modal = document.getElementById('stravaModal');
-        if (modal) {
-            modal.style.display = 'block';
-            const tokenInput = document.getElementById('stravaTokenInput');
-            if (tokenInput) {
-                tokenInput.placeholder = 'Authorization code received! Follow the steps below to exchange it for a token.';
-            }
-            
-            // Show instructions for exchanging code
-            const instructions = document.querySelector('.strava-connect-section');
-            if (instructions) {
-                instructions.innerHTML = `
-                    <p style="color: #4caf50; font-weight: 600;">✅ Authorization code received!</p>
-                    <p>Your authorization code: <code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">${escapeHtml(code)}</code></p>
-                    <p>To exchange this code for an access token, you need to make a POST request:</p>
-                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 15px 0; font-family: monospace; font-size: 0.9em;">
-                        <strong>POST</strong> https://www.strava.com/oauth/token<br><br>
-                        <strong>Body (form-data or JSON):</strong><br>
-                        client_id: YOUR_CLIENT_ID<br>
-                        client_secret: YOUR_CLIENT_SECRET<br>
-                        code: ${escapeHtml(code)}<br>
-                        grant_type: authorization_code
-                    </div>
-                    <p>You can use <a href="https://www.postman.com/" target="_blank">Postman</a>, <a href="https://httpie.io/" target="_blank">HTTPie</a>, or curl to make this request.</p>
-                    <p style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 0.9rem;">
-                        <strong>Example with curl:</strong><br>
-                        <code style="font-size: 0.85em; display: block; margin-top: 5px;">
-                            curl -X POST https://www.strava.com/oauth/token \\<br>
-                            &nbsp;&nbsp;-d client_id=YOUR_CLIENT_ID \\<br>
-                            &nbsp;&nbsp;-d client_secret=YOUR_CLIENT_SECRET \\<br>
-                            &nbsp;&nbsp;-d code=${escapeHtml(code)} \\<br>
-                            &nbsp;&nbsp;-d grant_type=authorization_code
-                        </code>
-                    </p>
-                    <p>Once you get the response, paste the <strong>access_token</strong> below:</p>
-                    <div style="margin: 20px 0;">
-                        <label for="stravaTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Access Token:</label>
-                        <input type="text" id="stravaTokenInput" placeholder="Paste your access token here" 
-                               style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                    </div>
-                    <button id="saveStravaToken" class="location-btn office-btn" style="width: 100%; margin-top: 10px;">
-                        Save Token
-                    </button>
-                `;
-                
-                // Re-initialize the save button listener after innerHTML replacement
-                setTimeout(() => {
-                    const saveBtn = document.getElementById('saveStravaToken');
-                    if (saveBtn) {
-                        // Remove any existing listeners by cloning
-                        const newSaveBtn = saveBtn.cloneNode(true);
-                        saveBtn.replaceWith(newSaveBtn);
-                        // Add event listener to the new button
-                        newSaveBtn.addEventListener('click', () => {
-                            const token = document.getElementById('stravaTokenInput').value.trim();
-                            if (token) {
-                                saveStravaToken(token, null);
-                            } else {
-                                showToast('Please enter an access token');
-                            }
-                        });
-                    }
-                }, 0);
-                }
-            }
-        }
-        
-        // Clean up URL
+        exchangeStravaCodeForToken(code);
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 }
@@ -1808,35 +1715,17 @@ async function updateStats() {
 function initializeStravaButtons() {
     const connectBtn = document.getElementById('stravaConnectBtn');
     const disconnectBtn = document.getElementById('stravaDisconnectBtn');
-    const stravaModal = document.getElementById('stravaModal');
-    const stravaModalClose = document.getElementById('stravaModalClose');
-    const saveTokenBtn = document.getElementById('saveStravaToken');
-    const configSection = document.getElementById('stravaConfigSection');
-    const startAuthBtn = document.getElementById('stravaStartAuth');
-    const cancelConfigBtn = document.getElementById('stravaCancelConfig');
-    const currentUrlDisplay = document.getElementById('currentUrlDisplay');
-    
-    // Set current URL as default redirect URI
-    if (currentUrlDisplay) {
-        const currentUrl = window.location.origin + window.location.pathname;
-        currentUrlDisplay.textContent = currentUrl;
-    }
-    
+
     if (connectBtn) {
         connectBtn.addEventListener('click', () => {
             if (!currentUser) {
                 showToast('Please sign in with Google first');
                 return;
             }
-            // Show configuration section instead of opening separate modal
-            if (configSection) {
-                configSection.style.display = 'block';
-                // Scroll to the config section
-                configSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
+            startStravaOAuth();
         });
     }
-    
+
     if (disconnectBtn) {
         disconnectBtn.addEventListener('click', () => {
             if (confirm('Are you sure you want to disconnect Strava?')) {
@@ -1844,223 +1733,56 @@ function initializeStravaButtons() {
             }
         });
     }
-    
-    if (stravaModalClose) {
-        stravaModalClose.addEventListener('click', () => {
-            stravaModal.style.display = 'none';
-        });
-    }
-    
-    if (saveTokenBtn) {
-        saveTokenBtn.addEventListener('click', () => {
-            const token = document.getElementById('stravaTokenInput').value.trim();
-            const refreshToken = document.getElementById('stravaRefreshTokenInput').value.trim();
-            
-            if (!token) {
-                showToast('Please enter an access token');
-                return;
-            }
-            
-            saveStravaToken(token, refreshToken);
-        });
-    }
-    
-    // Handle Start Authorization button
-    if (startAuthBtn) {
-        startAuthBtn.addEventListener('click', () => {
-            startStravaOAuth();
-        });
-    }
-    
-    // Handle Cancel button
-    if (cancelConfigBtn) {
-        cancelConfigBtn.addEventListener('click', () => {
-            if (configSection) {
-                configSection.style.display = 'none';
-                // Clear form fields
-                document.getElementById('stravaClientId').value = '';
-                document.getElementById('stravaClientSecret').value = '';
-                document.getElementById('stravaRedirectUri').value = '';
-                const statusDiv = document.getElementById('stravaAuthStatus');
-                if (statusDiv) {
-                    statusDiv.style.display = 'none';
-                    statusDiv.innerHTML = '';
-                }
-            }
-        });
-    }
-    
-    // Close modal when clicking outside
-    window.addEventListener('click', (e) => {
-        if (e.target === stravaModal) {
-            stravaModal.style.display = 'none';
-        }
-    });
 }
 
-// Start Strava OAuth flow
+// Start Strava OAuth using the shared app credentials from config.js.
+// The client secret never touches the browser — token exchange happens in
+// the worker at stravaConfig.tokenEndpoint (see strava-worker/README.md).
 function startStravaOAuth() {
-    const clientId = document.getElementById('stravaClientId').value.trim();
-    const clientSecret = document.getElementById('stravaClientSecret').value.trim();
-    const redirectUri = document.getElementById('stravaRedirectUri').value.trim() || 
-                        (window.location.origin + window.location.pathname);
-    const statusDiv = document.getElementById('stravaAuthStatus');
-    
-    // Validate inputs
-    if (!clientId) {
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = '❌ Please enter your Client ID';
-        } else {
-            showToast('Please enter your Client ID');
-        }
+    const cfg = window.stravaConfig || {};
+    if (!cfg.clientId || !cfg.tokenEndpoint) {
+        showToast('Strava is not configured for this deployment. See strava-worker/README.md.');
         return;
     }
-    
-    if (!clientSecret) {
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = '❌ Please enter your Client Secret';
-        } else {
-            showToast('Please enter your Client Secret');
-        }
-        return;
-    }
-    
-    // Store credentials and redirect URI in sessionStorage for token exchange
-    sessionStorage.setItem('stravaClientId', clientId);
-    sessionStorage.setItem('stravaClientSecret', clientSecret);
-    sessionStorage.setItem('stravaRedirectUri', redirectUri);
-    
-    // Show status with redirect URI info
-    if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.style.background = '#e3f2fd';
-        statusDiv.style.color = '#1565c0';
-        statusDiv.innerHTML = `⏳ Redirecting to Strava for authorization...<br><small style="font-size: 0.85em; margin-top: 5px; display: block;">Using redirect URI: ${redirectUri}</small>`;
-    }
-    
-    // Build OAuth URL
+
+    const redirectUri = window.location.origin + window.location.pathname;
     const oauthUrl = `https://www.strava.com/oauth/authorize?` +
-        `client_id=${encodeURIComponent(clientId)}&` +
+        `client_id=${encodeURIComponent(cfg.clientId)}&` +
         `response_type=code&` +
         `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `approval_prompt=force&` +
+        `approval_prompt=auto&` +
         `scope=activity:read_all`;
-    
-    console.log('Strava OAuth URL:', oauthUrl);
-    console.log('Redirect URI being used:', redirectUri);
-    
-    // Redirect to Strava
+
     window.location.href = oauthUrl;
 }
 
-// Exchange authorization code for access token
-async function exchangeStravaCodeForToken(code, clientId, clientSecret) {
-    const statusDiv = document.getElementById('stravaAuthStatus');
-    
-    // Show status
-    if (statusDiv) {
-        statusDiv.style.display = 'block';
-        statusDiv.style.background = '#e3f2fd';
-        statusDiv.style.color = '#1565c0';
-        statusDiv.innerHTML = '⏳ Exchanging authorization code for access token...';
+// Exchange the OAuth authorization code for tokens via the token worker
+async function exchangeStravaCodeForToken(code) {
+    const cfg = window.stravaConfig || {};
+    if (!cfg.tokenEndpoint) {
+        showToast('Strava is not configured for this deployment. See strava-worker/README.md.');
+        return;
     }
-    
+
+    showToast('Connecting to Strava...', 'info');
     try {
-        // Get the redirect URI that was used (from sessionStorage or current URL)
-        const redirectUri = sessionStorage.getItem('stravaRedirectUri') || 
-                           (window.location.origin + window.location.pathname);
-        
-        // Exchange code for token (Strava API requires form-data)
-        const formData = new URLSearchParams();
-        formData.append('client_id', clientId);
-        formData.append('client_secret', clientSecret);
-        formData.append('code', code);
-        formData.append('grant_type', 'authorization_code');
-        formData.append('redirect_uri', redirectUri); // Required by Strava
-        
-        const response = await fetch('https://www.strava.com/oauth/token', {
+        const redirectUri = window.location.origin + window.location.pathname;
+        const response = await fetch(`${cfg.tokenEndpoint.replace(/\/$/, '')}/exchange`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: formData.toString()
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code, redirect_uri: redirectUri })
         });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            let errorMessage = errorData.message || `HTTP ${response.status}: ${response.statusText}`;
-            
-            // Provide more helpful error message for redirect_uri errors
-            if (errorData.errors && errorData.errors.length > 0) {
-                const redirectError = errorData.errors.find(e => e.field === 'redirect_uri');
-                if (redirectError) {
-                    errorMessage = `Redirect URI mismatch. The redirect URI "${redirectUri}" must exactly match what's configured in your Strava app settings. Please check your Strava API settings at https://www.strava.com/settings/api and ensure the redirect URI matches exactly (including http/https, trailing slashes, etc.).`;
-                }
-            }
-            
-            throw new Error(errorMessage);
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || !data.access_token) {
+            throw new Error(data.message || `HTTP ${response.status}`);
         }
-        
-        const data = await response.json();
-        
-        // Clear stored credentials from sessionStorage
-        sessionStorage.removeItem('stravaClientId');
-        sessionStorage.removeItem('stravaClientSecret');
-        sessionStorage.removeItem('stravaRedirectUri');
-        
-        // Save tokens
-        if (data.access_token) {
-            saveStravaToken(data.access_token, data.refresh_token || null);
-            
-            // Show success message
-            if (statusDiv) {
-                statusDiv.style.display = 'block';
-                statusDiv.style.background = '#e8f5e9';
-                statusDiv.style.color = '#2e7d32';
-                statusDiv.innerHTML = '✅ Successfully connected to Strava!';
-            }
-            
-            // Hide config section after a short delay
-            setTimeout(() => {
-                const configSection = document.getElementById('stravaConfigSection');
-                if (configSection) {
-                    configSection.style.display = 'none';
-                    // Clear form fields
-                    document.getElementById('stravaClientId').value = '';
-                    document.getElementById('stravaClientSecret').value = '';
-                    document.getElementById('stravaRedirectUri').value = '';
-                    if (statusDiv) {
-                        statusDiv.style.display = 'none';
-                        statusDiv.innerHTML = '';
-                    }
-                }
-            }, 2000);
-        } else {
-            throw new Error('No access token in response');
-        }
+
+        saveStravaToken(data.access_token, data.refresh_token || null, data.expires_at || null);
+        showToast('Connected to Strava!', 'success');
     } catch (error) {
         console.error('Error exchanging code for token:', error);
-        
-        // Clear stored credentials
-        sessionStorage.removeItem('stravaClientId');
-        sessionStorage.removeItem('stravaClientSecret');
-        sessionStorage.removeItem('stravaRedirectUri');
-        
-        // Show error
-        if (statusDiv) {
-            statusDiv.style.display = 'block';
-            statusDiv.style.background = '#ffebee';
-            statusDiv.style.color = '#c62828';
-            statusDiv.innerHTML = `❌ Error: ${error.message}. Please try again.`;
-        } else {
-            showToast(`Error exchanging authorization code: ${error.message}`);
-        }
+        showToast(`Strava connection failed: ${error.message}`);
     }
 }
 
@@ -2227,8 +1949,8 @@ function checkStravaConnection() {
             loadStravaActivitiesFromDB().then(() => {
                 if (hasToken) {
                     console.log('Loaded activities from database, now syncing new ones...');
-                    // Then fetch new activities from Strava API
-                    fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
+                    // Then fetch new activities from Strava API (refreshing the token if needed)
+                    syncStravaActivities(data);
                 } else {
                     console.log('No token found, but loaded existing activities from database');
                 }
@@ -2236,7 +1958,7 @@ function checkStravaConnection() {
                 console.error('Error loading activities from database:', error);
                 if (hasToken) {
                     // Still try to fetch from API if we have a token
-                    fetchStravaActivities(data.stravaAccessToken, data.stravaRefreshToken);
+                    syncStravaActivities(data);
                 }
             });
         } else {
@@ -2329,60 +2051,90 @@ async function saveStravaActivitiesToDB(newActivities) {
     }
 }
 
-function saveStravaToken(accessToken, refreshToken) {
+function saveStravaToken(accessToken, refreshToken, expiresAt) {
     if (!currentUser || !db) {
         showToast('Please sign in with Google first');
         return;
     }
-    
+
     if (!accessToken || accessToken.trim() === '') {
-        showToast('Please enter a valid access token');
         return;
     }
-    
-    const userDocRef = db.collection('users').doc(currentUser);
-    
-    userDocRef.get().then(doc => {
-        const data = doc.exists ? doc.data() : {};
-        data.stravaAccessToken = accessToken.trim();
-        if (refreshToken && refreshToken.trim() !== '') {
-            data.stravaRefreshToken = refreshToken.trim();
+
+    persistStravaTokens(accessToken.trim(), refreshToken, expiresAt)
+        .then(() => {
+            console.log('Strava token saved successfully');
+
+            // Update UI immediately
+            const connectBtn = document.getElementById('stravaConnectBtn');
+            const disconnectBtn = document.getElementById('stravaDisconnectBtn');
+            if (connectBtn) connectBtn.style.display = 'none';
+            if (disconnectBtn) disconnectBtn.style.display = 'inline-flex';
+
+            // Load existing activities from database first, then fetch new ones
+            loadStravaActivitiesFromDB()
+                .catch(error => console.error('Error loading activities from database:', error))
+                .then(() => fetchStravaActivities(accessToken.trim(), refreshToken));
+        })
+        .catch(error => {
+            console.error('Error saving Strava token:', error);
+            showToast('Error saving token. Please try again.');
+        });
+}
+
+// Persist Strava tokens to the user doc with no UI side effects
+async function persistStravaTokens(accessToken, refreshToken, expiresAt) {
+    if (!currentUser || !db) {
+        throw new Error('Not signed in');
+    }
+    const update = { stravaAccessToken: accessToken };
+    if (refreshToken) update.stravaRefreshToken = refreshToken;
+    if (expiresAt) update.stravaTokenExpiresAt = expiresAt;
+    await db.collection('users').doc(currentUser).set(update, { merge: true });
+}
+
+// Refresh an expired access token via the token worker (strava-worker/).
+// Returns the new token data, or null if refresh isn't possible or failed.
+async function refreshStravaToken(refreshToken) {
+    const cfg = window.stravaConfig || {};
+    if (!refreshToken || !cfg.tokenEndpoint) {
+        return null;
+    }
+    try {
+        const response = await fetch(`${cfg.tokenEndpoint.replace(/\/$/, '')}/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.access_token) {
+            console.error('Strava token refresh failed:', data.message || response.status);
+            return null;
         }
-        
-        userDocRef.set(data, { merge: true })
-            .then(() => {
-                console.log('Strava token saved successfully');
-                document.getElementById('stravaModal').style.display = 'none';
-                document.getElementById('stravaTokenInput').value = '';
-                document.getElementById('stravaRefreshTokenInput').value = '';
-                
-                // Update UI immediately
-                document.getElementById('stravaConnectBtn').style.display = 'none';
-                document.getElementById('stravaDisconnectBtn').style.display = 'inline-flex';
-                
-                // Load existing activities from database first, then fetch new ones
-                loadStravaActivitiesFromDB().then(() => {
-                    // Fetch new activities from Strava API
-                fetchStravaActivities(accessToken.trim(), refreshToken ? refreshToken.trim() : null);
-                }).catch(error => {
-                    console.error('Error loading activities from database:', error);
-                    // Still try to fetch from API
-                    fetchStravaActivities(accessToken.trim(), refreshToken ? refreshToken.trim() : null);
-                });
-                
-                // Also check connection to ensure consistency
-                setTimeout(() => {
-                    checkStravaConnection();
-                }, 500);
-            })
-            .catch(error => {
-                console.error('Error saving Strava token:', error);
-                showToast('Error saving token. Please try again.');
-            });
-    }).catch(error => {
-        console.error('Error accessing database:', error);
-        showToast('Error accessing database. Please try again.');
-    });
+        await persistStravaTokens(data.access_token, data.refresh_token || refreshToken, data.expires_at || null);
+        return data;
+    } catch (error) {
+        console.error('Error refreshing Strava token:', error);
+        return null;
+    }
+}
+
+// Fetch activities, proactively refreshing the token if it's expired or
+// about to expire (Strava access tokens last 6 hours).
+async function syncStravaActivities(data) {
+    let accessToken = data.stravaAccessToken;
+    let refreshToken = data.stravaRefreshToken;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (data.stravaTokenExpiresAt && data.stravaTokenExpiresAt < nowSec + 300 && refreshToken) {
+        const refreshed = await refreshStravaToken(refreshToken);
+        if (refreshed) {
+            accessToken = refreshed.access_token;
+            refreshToken = refreshed.refresh_token || refreshToken;
+        }
+    }
+
+    fetchStravaActivities(accessToken, refreshToken);
 }
 
 function disconnectStrava(silent = false) {
@@ -2421,7 +2173,7 @@ function disconnectStrava(silent = false) {
     });
 }
 
-async function fetchStravaActivities(accessToken, refreshToken) {
+async function fetchStravaActivities(accessToken, refreshToken, isRetry = false) {
     if (!accessToken || accessToken.trim() === '') {
         console.log('No access token provided');
         return;
@@ -2482,10 +2234,17 @@ async function fetchStravaActivities(accessToken, refreshToken) {
         });
         
         if (response.status === 401) {
-            // Token expired or invalid - silently handle by clearing token and showing connect button
+            // Token expired or invalid - try a silent refresh once, then give up
+            if (!isRetry && refreshToken) {
+                console.log('Strava token expired - attempting refresh');
+                const refreshed = await refreshStravaToken(refreshToken);
+                if (refreshed) {
+                    return fetchStravaActivities(refreshed.access_token, refreshed.refresh_token || refreshToken, true);
+                }
+            }
             console.log('Strava token expired or invalid - reconnecting required');
             disconnectStrava(true); // Silent disconnect
-            showToast('Strava token is invalid or expired. Please reconnect with a valid token.');
+            showToast('Strava session expired. Please reconnect Strava from Settings.');
             return;
         }
         
@@ -2559,13 +2318,12 @@ async function fetchStravaActivities(accessToken, refreshToken) {
     } catch (error) {
         console.error('Error fetching Strava activities:', error);
         // Show alert for errors so user knows what went wrong
-        showToast(`Error fetching Strava activities: ${error.message}. Please check your token and try again.`);
+        showToast(`Error fetching Strava activities: ${error.message}`);
     }
 }
 
-// Token refresh is not implemented client-side as it requires a client secret
-// which should be kept on a backend server for security
-// Users need to reconnect when their token expires (tokens expire after 6 hours)
+// Token refresh happens via the Cloudflare Worker in strava-worker/, which
+// holds the shared client secret — see refreshStravaToken / syncStravaActivities.
 
 // Helper function to get icon for a specific activity
 function getActivityIcon(activity) {

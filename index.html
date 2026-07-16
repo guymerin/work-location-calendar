@@ -7,7 +7,7 @@
          script-src intentionally omits 'unsafe-inline' (the app uses no inline
          scripts/handlers). connect/frame allow Firebase Auth+Firestore, Google
          sign-in and Strava. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://www.strava.com https://rto-db.firebaseapp.com; frame-src 'self' https://rto-db.firebaseapp.com https://accounts.google.com https://apis.google.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://www.strava.com https://*.workers.dev https://rto-db.firebaseapp.com; frame-src 'self' https://rto-db.firebaseapp.com https://accounts.google.com https://apis.google.com;">
     <meta name="theme-color" content="#667eea">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -199,49 +199,6 @@
         </div>
     </div>
 
-    <div id="stravaModal" class="modal">
-        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="stravaModalTitle">
-            <span class="close" id="stravaModalClose" role="button" tabindex="0" aria-label="Close dialog">&times;</span>
-            <h3 id="stravaModalTitle">Connect Strava</h3>
-            <div class="strava-connect-section">
-                <p>To connect your Strava account, you'll need to get an access token:</p>
-                <ol style="text-align: left; margin: 20px 0; padding-left: 20px; line-height: 1.8;">
-                    <li>Go to <a href="https://www.strava.com/settings/api" target="_blank">Strava API Settings</a> and note your <strong>Client ID</strong></li>
-                    <li>Visit this URL (replace YOUR_CLIENT_ID with your actual Client ID):
-                        <br><code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 5px; font-size: 0.9em;">
-                            https://www.strava.com/oauth/authorize?client_id=YOUR_CLIENT_ID&response_type=code&redirect_uri=https://guymerin.github.io/work-location-calendar/&approval_prompt=force&scope=activity:read_all
-                        </code>
-                    </li>
-                    <li>Authorize the app - you'll be redirected back to your site</li>
-                    <li>Copy the <code>code</code> parameter from the URL in your browser's address bar</li>
-                    <li>Use a tool like <a href="https://www.postman.com/" target="_blank">Postman</a> or <a href="https://httpie.io/" target="_blank">HTTPie</a> to exchange the code for a token:
-                        <br><small style="color: #666;">POST to https://www.strava.com/oauth/token with: client_id, client_secret, code, grant_type=authorization_code</small>
-                    </li>
-                    <li>Paste the <strong>access_token</strong> from the response below</li>
-                </ol>
-                <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 8px; font-size: 0.9rem; color: #856404;">
-                    <strong>💡 Easier Alternative:</strong> Use <a href="https://www.strava.com/settings/api" target="_blank">Strava's API playground</a> to test API calls and get a temporary token, or use browser dev tools to extract the token from a successful API call.
-                </p>
-                <div style="margin: 20px 0;">
-                    <label for="stravaTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Access Token:</label>
-                    <input type="text" id="stravaTokenInput" placeholder="Paste your Strava access token here" 
-                           style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                </div>
-                <div style="margin: 20px 0;">
-                    <label for="stravaRefreshTokenInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Refresh Token (optional):</label>
-                    <input type="text" id="stravaRefreshTokenInput" placeholder="Paste your refresh token (optional)" 
-                           style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                </div>
-                <button id="saveStravaToken" class="location-btn office-btn" style="width: 100%; margin-top: 10px;">
-                    Save Token
-                </button>
-                <p style="margin-top: 15px; font-size: 0.85rem; color: #666;">
-                    <strong>Note:</strong> Strava access tokens expire after 6 hours. If your workouts stop showing, simply reconnect by clicking "Connect Strava" again and pasting a new token. The app will automatically detect when your token expires and show the connect button again.
-                </p>
-            </div>
-        </div>
-    </div>
-
     <div id="settingsModal" class="modal">
         <div class="modal-content settings-modal-content" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
             <span class="close" id="settingsModalClose" role="button" tabindex="0" aria-label="Close dialog">&times;</span>
@@ -258,51 +215,10 @@
                         <span>🏃</span> Disconnect Strava
                     </button>
                 </div>
-                
-                <!-- Strava Configuration Section (shown when Connect is clicked) -->
-                <div id="stravaConfigSection" class="strava-config-section" style="display: none; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
-                    <h5 style="margin-bottom: 15px; color: #667eea; font-size: 1rem;">Enter Your Strava API Credentials</h5>
-                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">
-                        Get these from <a href="https://www.strava.com/settings/api" target="_blank" style="color: #667eea;">Strava API Settings</a>
-                    </p>
-                    
-                    <div class="strava-config-form" style="display: flex; flex-direction: column; gap: 15px;">
-                        <div>
-                            <label for="stravaClientId" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Client ID *</label>
-                            <input type="text" id="stravaClientId" placeholder="Enter your Strava Client ID" 
-                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                        </div>
-                        
-                        <div>
-                            <label for="stravaClientSecret" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Client Secret *</label>
-                            <input type="password" id="stravaClientSecret" placeholder="Enter your Strava Client Secret" 
-                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                        </div>
-                        
-                        <div>
-                            <label for="stravaRedirectUri" style="display: block; margin-bottom: 5px; font-weight: 600; color: #333;">Redirect URI</label>
-                            <input type="text" id="stravaRedirectUri" placeholder="https://your-domain.com" 
-                                   style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-                            <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">
-                                Leave empty to use current page URL: <span id="currentUrlDisplay"></span>
-                            </small>
-                            <small style="color: #d32f2f; font-size: 0.85rem; display: block; margin-top: 5px; font-weight: 600;">
-                                ⚠️ Important: This redirect URI must EXACTLY match what's configured in your Strava app settings (including http/https, trailing slashes, etc.)
-                            </small>
-                        </div>
-                        
-                        <div style="display: flex; gap: 10px; margin-top: 10px;">
-                            <button id="stravaStartAuth" class="strava-btn" style="flex: 1;">
-                                <span>🔗</span> Authorize with Strava
-                            </button>
-                            <button id="stravaCancelConfig" class="strava-btn disconnect" style="flex: 0 0 auto;">
-                                Cancel
-                            </button>
-                        </div>
-                        
-                        <div id="stravaAuthStatus" style="margin-top: 10px; padding: 10px; border-radius: 8px; display: none;"></div>
-                    </div>
-                </div>
+                <p style="font-size: 0.85rem; color: #666; margin-top: 10px;">
+                    Connecting sends you to Strava to log in and approve read access to your
+                    activities — no API keys needed. Tokens refresh automatically.
+                </p>
             </div>
 
             <!-- Weekly Goals Section -->
@@ -393,7 +309,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260608b"></script>
+    <script src="app.js?v=20260716a"></script>
 </body>
 </html>
 

@@ -1,0 +1,12 @@
+name = "strava-token"
+main = "worker.js"
+compatibility_date = "2026-07-16"
+
+[vars]
+# Public — same value as stravaConfig.clientId in config.js
+STRAVA_CLIENT_ID = "REPLACE_WITH_YOUR_CLIENT_ID"
+# Comma-separated origins allowed to call this worker (localhost is always allowed)
+ALLOWED_ORIGINS = "https://guymerin.github.io"
+
+# STRAVA_CLIENT_SECRET is NOT set here — it's a secret:
+#   npx wrangler secret put STRAVA_CLIENT_SECRET

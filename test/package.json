@@ -7,7 +7,8 @@
   "scripts": {
     "test": "node modal.test.mjs",
     "test:mobile": "node mobile.test.mjs",
-    "postinstall": "playwright install chromium webkit"
+    "postinstall": "playwright install chromium webkit",
+    "test:strava": "node strava.test.mjs"
   },
   "devDependencies": {
     "playwright": "^1.60.0"

@@ -11,3 +11,12 @@ window.firebaseConfig = {
     messagingSenderId: "361275779673",
     appId: "1:361275779673:web:d65a7126821f57e54a1f48"
 };
+
+// Strava OAuth (shared app). clientId is public; the client secret lives in
+// the Cloudflare Worker at tokenEndpoint — see strava-worker/README.md.
+// Until both values are filled in, the Connect Strava button explains that
+// Strava isn't configured for this deployment.
+window.stravaConfig = {
+    clientId: "",      // e.g. "123456" from https://www.strava.com/settings/api
+    tokenEndpoint: ""  // e.g. "https://strava-token.<subdomain>.workers.dev"
+};
