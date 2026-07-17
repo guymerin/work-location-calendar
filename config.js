@@ -17,6 +17,6 @@ window.firebaseConfig = {
 // Until both values are filled in, the Connect Strava button explains that
 // Strava isn't configured for this deployment.
 window.stravaConfig = {
-    clientId: "",      // e.g. "123456" from https://www.strava.com/settings/api
-    tokenEndpoint: ""  // e.g. "https://strava-token.<subdomain>.workers.dev"
+    clientId: "184154",
+    tokenEndpoint: "https://strava-token.guy-merin.workers.dev"
 };

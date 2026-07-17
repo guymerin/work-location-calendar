@@ -4,7 +4,7 @@ compatibility_date = "2026-07-16"
 
 [vars]
 # Public — same value as stravaConfig.clientId in config.js
-STRAVA_CLIENT_ID = "REPLACE_WITH_YOUR_CLIENT_ID"
+STRAVA_CLIENT_ID = "184154"
 # Comma-separated origins allowed to call this worker (localhost is always allowed)
 ALLOWED_ORIGINS = "https://guymerin.github.io"
 

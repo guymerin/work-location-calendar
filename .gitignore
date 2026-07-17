@@ -20,3 +20,4 @@ test/node_modules/
 test/screenshots/
 test/package-lock.json
 
+.wrangler/
