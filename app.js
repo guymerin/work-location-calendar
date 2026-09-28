@@ -99,7 +99,17 @@ let hideWeekends = localStorage.getItem('hideWeekends') === 'true';
 
 // What-If mode: tentative location overrides not persisted to Firebase
 let whatIfMode = false;
-let whatIfData = {}; // dateKey -> 'home' | 'office' | 'nonworkday' | null (clear)
+let whatIfData = {}; // dateKey -> 'home' | 'office' | 'nonworkday' | 'vacationswipe' | null (clear)
+
+// 'vacationswipe' = a vacation / non-work day on which the badge was still swiped.
+// It is shown and tallied as vacation, but counts as an office day for BELT.
+function countsAsOfficeDay(location) {
+    return location === 'office' || location === 'vacationswipe';
+}
+
+function isVacationLocation(location) {
+    return location === 'nonworkday' || location === 'vacationswipe';
+}
 let whatIfWindowEnd = null; // Date (Monday of the chosen end week) or null for auto
 
 // Returns true if the given Date is today or in the future (date-only comparison)
@@ -947,7 +957,7 @@ function updateMonthlyStatus(year, month, effectiveData) {
         const loc = data[key];
         if (loc === 'office') office++;
         else if (loc === 'home') home++;
-        else if (loc === 'nonworkday') vacation++;
+        else if (isVacationLocation(loc)) vacation++;
         else if (date <= today) unset++; // only count unset for past / today
     }
 
@@ -983,7 +993,7 @@ function updateYearToDateStatus(effectiveData) {
         const loc = data[key];
         if (loc === 'office') office++;
         else if (loc === 'home') home++;
-        else if (loc === 'nonworkday') vacation++;
+        else if (isVacationLocation(loc)) vacation++;
         else unset++;
     }
 
@@ -1066,7 +1076,8 @@ function openModal(date) {
                 const colors = {
                     home: { bg: '#f1f8f4', border: '#4caf50' },
                     office: { bg: '#f0f7ff', border: '#2196f3' },
-                    nonworkday: { bg: '#fff8e1', border: '#ff9800' }
+                    nonworkday: { bg: '#fff8e1', border: '#ff9800' },
+                    vacationswipe: { bg: '#fff8e1', border: '#ff9800' }
                 };
                 const c = colors[location] || colors.office;
                 activeBtn.style.background = c.bg;
@@ -1181,6 +1192,10 @@ function updateDayElement(dayElement, location) {
         indicator.className = 'location-indicator nonworkday';
         indicator.textContent = '🌴';
         statusText = 'non-work day';
+    } else if (location === 'vacationswipe') {
+        indicator.className = 'location-indicator nonworkday vacationswipe';
+        indicator.innerHTML = '🌴<span class="swipe-badge" aria-hidden="true">🪪</span>';
+        statusText = 'vacation day, badge swiped';
     } else {
         indicator.className = 'location-indicator';
         indicator.textContent = '';
@@ -1396,7 +1411,7 @@ function addWeekStatsCells(year, month, startingDayOfWeek, daysInMonth, location
                 // which all ignore unmarked weekends rather than defaulting them.
                 const location = locationData[dateKey] || 'none';
                 
-                if (location === 'office') {
+                if (countsAsOfficeDay(location)) {
                     officeDays++;
                 }
 
@@ -1565,10 +1580,10 @@ function computeWorkStats(data, includeFuture = false, customWindowEnd = null) {
         let officeDays = 0;
         let hasData = false;
         week.days.forEach(location => {
-            if (location === 'home' || location === 'office' || location === 'nonworkday') {
+            if (location === 'home' || location === 'office' || isVacationLocation(location)) {
                 hasData = true;
             }
-            if (location === 'office') officeDays++;
+            if (countsAsOfficeDay(location)) officeDays++;
         });
         return { weekStart: week.weekStart, officeDays, hasData };
     });
