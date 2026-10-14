@@ -565,6 +565,11 @@ h1 {
     background: rgba(255, 255, 255, 0.35);
 }
 
+/* Mobile-only control; the media query below reveals it. */
+.stats-toggle {
+    display: none;
+}
+
 .belt-overview-content {
     max-width: 560px;
 }
@@ -1335,13 +1340,25 @@ h1 {
     }
 
     h1 {
-        font-size: 1.5rem;
+        font-size: 1.25rem;
     }
 
     header {
         flex-direction: column;
         align-items: stretch;
-        gap: 12px;
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+
+    .user-display,
+    .signout-btn {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+
+    .settings-btn {
+        padding: 6px 10px;
+        font-size: 1.1rem;
     }
 
     .user-section {
@@ -1362,17 +1379,45 @@ h1 {
         flex: 0 0 auto;
     }
 
+    /* One row: arrow / month / arrow. The buttons keep their "← September"
+       text for screen readers (font-size: 0 hides it visually only) and show a
+       chevron glyph instead, so the nav costs one 44px row rather than three. */
     .calendar-controls {
-        flex-direction: column;
-        gap: 15px;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
     }
 
     .nav-btn {
-        width: 100%;
+        flex: 0 0 auto;
+        width: 44px;
+        min-height: 44px;
+        padding: 0;
+        font-size: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .stats-section {
-        grid-template-columns: 1fr;
+    .nav-btn::after {
+        font-size: 1.5rem;
+        line-height: 1;
+        font-weight: 600;
+        color: #667eea;
+    }
+
+    .nav-btn:hover::after {
+        color: inherit;
+    }
+
+    #prevMonth::after { content: '\2039'; }
+    #nextMonth::after { content: '\203A'; }
+
+    #currentMonthYear {
+        flex: 1 1 auto;
+        text-align: center;
+        font-size: 1.15rem;
     }
 
     .stat-value {
@@ -1413,6 +1458,115 @@ h1 {
         flex: 1 1 calc(50% - 8px);
         justify-content: center;
         min-height: 44px;
+    }
+
+    /* ----- Calendar-first layout -----
+       The grid used to sit ~2 screens down on a phone, below the monthly and
+       year-to-date counts, the filter toggles and two full-size stat cards.
+       Here the BELT bar + its toggle move directly under the month nav and the
+       grid follows; everything else collapses behind the toggle. Ordering is
+       done with flex `order` so the desktop DOM order is untouched. */
+    .container {
+        display: flex;
+        flex-direction: column;
+    }
+
+    header { order: 1; }
+    .signed-out-prompt { order: 2; }
+    .calendar-controls { order: 3; }
+    .stats-section { order: 4; }
+    .what-if-banner { order: 5; }
+    .monthly-status { order: 6; }
+    .status-group { order: 7; }
+    .filter-controls { order: 8; }
+    .calendar-container { order: 9; }
+
+    .stats-section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 14px;
+    }
+
+    .stats-section .belt-card { order: 1; }
+    .stats-toggle { order: 2; }
+    .stats-section .stat-card:not(.belt-card) { order: 3; }
+
+    /* BELT as a compact hero bar: value beside the label instead of under it. */
+    .stat-card.belt-card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 2px 12px;
+        padding: 12px 14px;
+    }
+
+    .belt-card .stat-label {
+        grid-column: 1;
+        margin: 0;
+    }
+
+    .belt-card .stat-value {
+        grid-column: 2;
+        grid-row: 1;
+        font-size: 1.9rem;
+    }
+
+    /* Row 2 pairs the caption with the Overview button so the bar is two rows
+       tall rather than four. The what-if sub-line gets its own row when shown. */
+    .belt-card .stat-description {
+        grid-column: 1;
+        font-size: 0.75rem;
+    }
+
+    .belt-card .belt-actual-sub {
+        grid-column: 1 / -1;
+        margin-top: 0;
+    }
+
+    .belt-card .belt-overview-btn {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: end;
+        margin-top: 0;
+        padding: 5px 10px;
+        white-space: nowrap;
+    }
+
+    .stats-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        min-height: 40px;
+        padding: 8px 12px;
+        background: #f5f5f7;
+        color: #667eea;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .stats-toggle-chevron {
+        font-size: 0.8rem;
+        transition: transform 0.2s ease;
+    }
+
+    .container:not(.stats-collapsed) .stats-toggle-chevron {
+        transform: rotate(180deg);
+    }
+
+    /* Collapsed (the default): the BELT bar is the only thing between the month
+       nav and the grid. The what-if banner is deliberately NOT collapsed — it
+       is hidden unless the mode is on, and it holds the 12-week window input. */
+    .container.stats-collapsed .monthly-status,
+    .container.stats-collapsed .status-group,
+    .container.stats-collapsed .filter-controls,
+    .container.stats-collapsed .stats-section .stat-card:not(.belt-card) {
+        display: none;
     }
 
     /* Keep the 7-day + stats column layout but allow horizontal swipe
@@ -1559,5 +1713,6 @@ h1 {
 
 @media (prefers-reduced-motion: reduce) {
     .toast { animation: none; }
+    .stats-toggle-chevron { transition: none; }
 }
 

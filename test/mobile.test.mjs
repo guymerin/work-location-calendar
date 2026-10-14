@@ -29,6 +29,7 @@ for (const t of targets) {
     label: t.label,
     prefix: t.prefix,
     keyboard: false,
+    mobileLayout: true,
   });
   await browser.close();
   const failed = results.filter(r => !r.ok).length;

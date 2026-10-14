@@ -83,7 +83,7 @@ export const FIREBASE_MOCK = `
 // Runs the full flow in a fresh context. `label` names the run; `prefix` prefixes
 // screenshot files. `keyboard` toggles the Esc check (off for touch-only devices).
 // Returns an array of { name, ok } results.
-export async function runChecks(browser, { contextOptions = {}, label, prefix, keyboard = true }) {
+export async function runChecks(browser, { contextOptions = {}, label, prefix, keyboard = true, mobileLayout = false }) {
   const { mockDoc } = buildMockDoc();
   const results = [];
   const check = (name, cond, extra = '') => {
@@ -149,6 +149,29 @@ export async function runChecks(browser, { contextOptions = {}, label, prefix, k
   check('calendar rendered home indicators', homeCells > 0, `${homeCells} home cells`);
   check('BELT value computed (numeric)', /\d/.test(belt), `BELT="${belt.trim()}" avg="${avg.trim()}"`);
   await page.screenshot({ path: path.join(OUT, `${prefix}-calendar.png`), fullPage: true });
+
+  // Mobile layout: the point of the collapsible stats panel is that the grid is
+  // reachable without scrolling past two screens of numbers.
+  if (mobileLayout) {
+    const viewportH = page.viewportSize().height;
+    const gridTop = await page.locator('.calendar-container').evaluate(el => el.getBoundingClientRect().top);
+    const beltTop = await page.locator('#beltCard').evaluate(el => el.getBoundingClientRect().top);
+    check('calendar grid starts within the first screen', gridTop < viewportH,
+      `grid top ${Math.round(gridTop)}px, viewport ${viewportH}px`);
+    check('BELT hero sits above the calendar', beltTop < gridTop && await page.locator('#beltCard').isVisible(),
+      `belt top ${Math.round(beltTop)}px`);
+    check('stats panel is collapsed by default', !(await page.locator('#ytdStatus').isVisible()));
+
+    await page.locator('#statsToggle').click();
+    await page.waitForTimeout(200);
+    check('Stats toggle reveals year-to-date + filters',
+      (await page.locator('#ytdStatus').isVisible()) && (await page.locator('.filter-controls').isVisible()));
+    await page.screenshot({ path: path.join(OUT, `${prefix}-calendar-expanded.png`), fullPage: true });
+
+    await page.locator('#statsToggle').click();
+    await page.waitForTimeout(200);
+    check('Stats toggle collapses again', !(await page.locator('#ytdStatus').isVisible()));
+  }
 
   const dayCell = page.locator('.calendar-day[aria-label*="June 10, 2026"]').first();
   const openModal = async () => {

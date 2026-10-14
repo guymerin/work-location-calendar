@@ -97,6 +97,11 @@ let activeFilters = {
 
 let hideWeekends = localStorage.getItem('hideWeekends') === 'true';
 
+// Mobile only: the monthly/YTD counts, filter toggles and weekly-average card
+// collapse behind a toggle so the grid stays above the fold. The markup ships
+// collapsed; desktop CSS ignores the class and hides the toggle.
+let statsExpanded = localStorage.getItem('statsExpanded') === 'true';
+
 // What-If mode: tentative location overrides not persisted to Firebase
 let whatIfMode = false;
 let whatIfData = {}; // dateKey -> 'home' | 'office' | 'nonworkday' | 'vacationswipe' | null (clear)
@@ -333,6 +338,10 @@ function initializeApp() {
     // Hide-weekends toggle
     document.getElementById('hideWeekendsToggle').addEventListener('click', toggleHideWeekends);
     applyHideWeekends();
+
+    // Collapsible stats panel (mobile)
+    document.getElementById('statsToggle').addEventListener('click', toggleStatsPanel);
+    applyStatsPanel();
 
     // Close modal when clicking outside
     window.addEventListener('click', (e) => {
@@ -683,6 +692,22 @@ function applyHideWeekends() {
         if (btn) btn.classList.remove('active');
         if (label) label.textContent = 'Hide Weekends';
     }
+}
+
+function toggleStatsPanel() {
+    statsExpanded = !statsExpanded;
+    localStorage.setItem('statsExpanded', statsExpanded ? 'true' : 'false');
+    applyStatsPanel();
+}
+
+function applyStatsPanel() {
+    const container = document.querySelector('.container');
+    const btn = document.getElementById('statsToggle');
+    const label = document.getElementById('statsToggleLabel');
+    if (!container) return;
+    container.classList.toggle('stats-collapsed', !statsExpanded);
+    if (btn) btn.setAttribute('aria-expanded', statsExpanded ? 'true' : 'false');
+    if (label) label.textContent = statsExpanded ? 'Hide stats' : 'Show stats';
 }
 
 async function openBeltOverview() {
