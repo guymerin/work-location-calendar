@@ -5,7 +5,7 @@
 //
 // Run:  cd test && npm install && npm run test:strava
 import { createRequire } from 'module';
-import { buildMockDoc, mockUser, FIREBASE_MOCK, REPO } from './harness.mjs';
+import { buildMockDoc, mockUser, FIREBASE_MOCK, REPO, installFakeClock } from './harness.mjs';
 import path from 'path';
 
 const require = createRequire(import.meta.url);
@@ -25,6 +25,10 @@ async function newAppPage({ stravaConfig, extraDoc = {}, workerHandler }) {
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
+
+  // Required: the seeded doc only covers the weeks up to MOCK_TODAY, so without
+  // this the app opens on the real current month and renders no seeded data.
+  await installFakeClock(page);
 
   await page.addInitScript(({ doc, user, uid, cfg }) => {
     window.__MOCK_FIRESTORE__ = { ['users/' + uid]: doc };

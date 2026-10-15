@@ -12,6 +12,31 @@ mkdirSync(OUT, { recursive: true });
 
 export const mockUser = { uid: 'MOCK-TEST-UID-do-not-use', displayName: 'Mock Tester', email: 'mock@example.test' };
 
+// The one "today" the mock data is built around. buildMockDoc seeds ~14 weeks
+// up to this date, so every suite MUST pin the browser clock here via
+// installFakeClock -- otherwise the app opens on the real current month, finds
+// no seeded data, and selectors like .location-indicator.office never match.
+export const MOCK_TODAY = new Date(2026, 5, 8, 12, 0, 0);
+
+// Shifts the page's Date by a constant offset so `new Date()` reads MOCK_TODAY.
+// Only Date is faked -- timers keep running on real time.
+export async function installFakeClock(page) {
+  await page.addInitScript(fakeNow => {
+    const RealDate = Date;
+    const offset = fakeNow - RealDate.now();
+    class ShiftedDate extends RealDate {
+      constructor(...args) {
+        if (args.length === 0) super(RealDate.now() + offset);
+        else super(...args);
+      }
+      static now() { return RealDate.now() + offset; }
+    }
+    ShiftedDate.parse = RealDate.parse;
+    ShiftedDate.UTC = RealDate.UTC;
+    window.Date = ShiftedDate;
+  }, MOCK_TODAY.getTime());
+}
+
 function fmt(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -21,7 +46,7 @@ function fmt(d) {
 
 // Deterministic mock data relative to a fixed "today" (June 8 2026).
 export function buildMockDoc() {
-  const today = new Date(2026, 5, 8);
+  const today = new Date(MOCK_TODAY.getFullYear(), MOCK_TODAY.getMonth(), MOCK_TODAY.getDate());
   const mockData = {};
   const start = new Date(today); start.setDate(start.getDate() - 14 * 7);
   const end = new Date(2026, 5, 30);
@@ -94,25 +119,9 @@ export async function runChecks(browser, { contextOptions = {}, label, prefix, k
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
 
-  // The seeded data is built around a fixed "today" (June 8 2026, see
-  // buildMockDoc) and the checks click "June 10, 2026", so shift the app's
-  // clock to that date by a constant offset. Only Date is faked — timers
-  // keep running on real time.
-  const FAKE_NOW = new Date(2026, 5, 8, 12, 0, 0).getTime();
-  await page.addInitScript(fakeNow => {
-    const RealDate = Date;
-    const offset = fakeNow - RealDate.now();
-    class ShiftedDate extends RealDate {
-      constructor(...args) {
-        if (args.length === 0) super(RealDate.now() + offset);
-        else super(...args);
-      }
-      static now() { return RealDate.now() + offset; }
-    }
-    ShiftedDate.parse = RealDate.parse;
-    ShiftedDate.UTC = RealDate.UTC;
-    window.Date = ShiftedDate;
-  }, FAKE_NOW);
+  // The seeded data is built around MOCK_TODAY and the checks click
+  // "June 10, 2026", so pin the app's clock there.
+  await installFakeClock(page);
 
   await page.addInitScript(({ doc, user, uid }) => {
     window.__MOCK_FIRESTORE__ = { ['users/' + uid]: doc };
