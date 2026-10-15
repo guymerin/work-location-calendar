@@ -1569,26 +1569,74 @@ h1 {
         display: none;
     }
 
-    /* Keep the 7-day + stats column layout but allow horizontal swipe
-       instead of squeezing each cell into an unreadable 40px column. */
+    /* The whole week fits on screen. The Stats column is what used to force a
+       640px grid — its badges are fixed 44px circles that can never fit a ~36px
+       column — so on mobile the grid drops to 7 day columns and each week's
+       stats cell (already emitted right after that week's 7 days) spans the full
+       width as its own strip below the week. No JS change: the DOM order is
+       already right, only the grid placement differs. */
     .calendar-container {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+        overflow-x: hidden;
         max-width: 100%;
     }
 
+    /* minmax(0, 1fr), not 1fr: a bare 1fr floors each column at min-content, and
+       "Wed" plus the default 10px header padding is wider than the ~45px a
+       seven-column phone layout can give it. */
     .calendar-header,
     .calendar-grid {
-        min-width: 640px;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 5px;
     }
 
     .calendar-container.hide-weekends .calendar-header,
     .calendar-container.hide-weekends .calendar-grid {
-        min-width: 480px;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .day-header {
+        padding: 6px 2px;
+        font-size: 0.75rem;
+    }
+
+    /* The "Stats" column header has no column to label any more. */
+    .stats-header {
+        display: none;
+    }
+
+    .week-stats-cell {
+        grid-column: 1 / -1;
+        aspect-ratio: auto;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+        padding: 4px 0 8px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    /* The strip repeats once per week, so every px of badge height costs a week
+       of vertical reach. 44px is a touch target; these are read, not tapped. */
+    .week-stats-cell .stat-label {
+        width: 30px;
+        height: 30px;
+        font-size: 0.95rem;
+    }
+
+    .week-stats-cell .stat-badge-number {
+        font-size: 0.55rem;
+        min-width: 13px;
+        padding: 1px 3px;
+        top: -3px;
+        right: -3px;
+    }
+
+    .week-stats-cell .stat-row {
+        gap: 6px;
     }
 
     .calendar-day {
-        padding: 6px;
+        padding: 3px;
     }
 
     .day-number {

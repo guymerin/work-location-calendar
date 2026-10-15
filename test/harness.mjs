@@ -171,6 +171,32 @@ export async function runChecks(browser, { contextOptions = {}, label, prefix, k
     await page.locator('#statsToggle').click();
     await page.waitForTimeout(200);
     check('Stats toggle collapses again', !(await page.locator('#ytdStatus').isVisible()));
+
+    // The whole week must be readable without a horizontal swipe: Friday drives
+    // the BELT window (the current week only counts once Friday has data), and
+    // it used to be one of the columns parked off-screen.
+    const cal = await page.locator('.calendar-container').evaluate(el => ({
+      scrollW: el.scrollWidth, clientW: el.clientWidth,
+    }));
+    check('week fits without horizontal swipe', cal.scrollW <= cal.clientW + 1,
+      `grid ${cal.scrollW}px in ${cal.clientW}px`);
+
+    const sundayVisible = await page.evaluate(() => {
+      const container = document.querySelector('.calendar-container');
+      const days = [...document.querySelectorAll('.calendar-grid .calendar-day')];
+      if (days.length < 7) return false;
+      // 7th cell of the first week row = Sunday.
+      return days[6].getBoundingClientRect().right <= container.getBoundingClientRect().right + 1;
+    });
+    check('Sunday column is on screen', sundayVisible);
+
+    const statsStripFullWidth = await page.evaluate(() => {
+      const strip = document.querySelector('.calendar-grid .week-stats-cell');
+      const grid = document.querySelector('.calendar-grid');
+      if (!strip) return false;
+      return strip.getBoundingClientRect().width > grid.getBoundingClientRect().width * 0.9;
+    });
+    check('week stats span the full row', statsStripFullWidth);
   }
 
   const dayCell = page.locator('.calendar-day[aria-label*="June 10, 2026"]').first();
