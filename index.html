@@ -11,6 +11,12 @@
     <meta name="theme-color" content="#667eea">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <!-- Home-screen name on iOS; the manifest's short_name covers Android. -->
+    <meta name="apple-mobile-web-app-title" content="Work Cal">
+    <link rel="manifest" href="manifest.webmanifest?v=20261015a">
+    <!-- iOS ignores the manifest's icons and uses apple-touch-icon. -->
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
     <title>Work Location Calendar</title>
     <link rel="stylesheet" href="styles.css?v=20261014a">
     <!-- Firebase Configuration - MUST BE LOADED FIRST -->
