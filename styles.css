@@ -1589,11 +1589,6 @@ h1 {
         gap: 5px;
     }
 
-    .calendar-container.hide-weekends .calendar-header,
-    .calendar-container.hide-weekends .calendar-grid {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-
     .day-header {
         padding: 6px 2px;
         font-size: 0.75rem;
@@ -1633,6 +1628,57 @@ h1 {
 
     .week-stats-cell .stat-row {
         gap: 6px;
+    }
+
+    /* Work-week mode frees two columns, so the stats go back beside their week
+       instead of in a strip below it. The column is wider than a day (4
+       badges across, fixed so it holds them even on a 375px phone) and the
+       badges shrink so 7 of them (office + 6 activities) fit in two rows inside
+       one day-cell's height. */
+    .calendar-container.hide-weekends .calendar-header,
+    .calendar-container.hide-weekends .calendar-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr)) 78px;
+    }
+
+    .calendar-container.hide-weekends .stats-header {
+        display: block;
+    }
+
+    .calendar-container.hide-weekends .week-stats-cell {
+        grid-column: auto;
+        display: grid;
+        grid-template-columns: repeat(4, 17px);
+        grid-auto-rows: 17px;
+        justify-content: center;
+        align-content: center;
+        gap: 5px 1px;
+        padding: 0;
+        border-bottom: none;
+    }
+
+    /* Flatten the office row and the health row into one wrapping grid. */
+    .calendar-container.hide-weekends .week-stats-cell .stat-row {
+        display: contents;
+    }
+
+    .calendar-container.hide-weekends .week-stats-cell .stat-item {
+        height: 17px;
+    }
+
+    .calendar-container.hide-weekends .week-stats-cell .stat-label {
+        width: 17px;
+        height: 17px;
+        font-size: 0.6rem;
+        border-width: 0;
+        box-shadow: none;
+    }
+
+    .calendar-container.hide-weekends .week-stats-cell .stat-badge-number {
+        font-size: 0.5rem;
+        min-width: 10px;
+        padding: 0 2px;
+        top: -5px;
+        right: -3px;
     }
 
     .calendar-day {

@@ -190,22 +190,41 @@ export async function runChecks(browser, { contextOptions = {}, label, prefix, k
     check('week fits without horizontal swipe', cal.scrollW <= cal.clientW + 1,
       `grid ${cal.scrollW}px in ${cal.clientW}px`);
 
-    const sundayVisible = await page.evaluate(() => {
+    // Work week (Mon-Fri) is the default; Sat/Sun only appear once toggled on.
+    const weekColumn = (i) => page.evaluate((i) => {
       const container = document.querySelector('.calendar-container');
       const days = [...document.querySelectorAll('.calendar-grid .calendar-day')];
-      if (days.length < 7) return false;
-      // 7th cell of the first week row = Sunday.
-      return days[6].getBoundingClientRect().right <= container.getBoundingClientRect().right + 1;
-    });
-    check('Sunday column is on screen', sundayVisible);
+      if (days.length < 7) return null;
+      const r = days[i].getBoundingClientRect();
+      if (r.width === 0) return 'hidden';
+      return r.right <= container.getBoundingClientRect().right + 1 ? 'visible' : 'offscreen';
+    }, i);
+    // 5th / 7th cell of the first week row = Friday / Sunday.
+    check('work week is the default (weekends hidden)', await weekColumn(6) === 'hidden');
+    check('Friday column is on screen', await weekColumn(4) === 'visible');
 
+    // Work week: each week's stats sit in a 6th column beside Friday, on the
+    // same row and inside the visible width.
+    const statsBesideWeek = await page.evaluate(() => {
+      const container = document.querySelector('.calendar-container').getBoundingClientRect();
+      const fri = document.querySelectorAll('.calendar-grid .calendar-day')[4].getBoundingClientRect();
+      const stats = document.querySelector('.calendar-grid .week-stats-cell').getBoundingClientRect();
+      return stats.left >= fri.right && Math.abs(stats.top - fri.top) < 2
+        && stats.right <= container.right + 1 && stats.height <= fri.height + 5;
+    });
+    check('work week: stats column beside Friday', statsBesideWeek);
+
+    // Full week: no room for an 8th column, so stats drop to a full-width strip.
+    await page.evaluate(() => document.getElementById('hideWeekendsToggle').click());
+    check('Show Weekends puts Sunday on screen', await weekColumn(6) === 'visible');
     const statsStripFullWidth = await page.evaluate(() => {
       const strip = document.querySelector('.calendar-grid .week-stats-cell');
       const grid = document.querySelector('.calendar-grid');
       if (!strip) return false;
       return strip.getBoundingClientRect().width > grid.getBoundingClientRect().width * 0.9;
     });
-    check('week stats span the full row', statsStripFullWidth);
+    check('full week: stats span the full row', statsStripFullWidth);
+    await page.evaluate(() => document.getElementById('hideWeekendsToggle').click());
   }
 
   const dayCell = page.locator('.calendar-day[aria-label*="June 10, 2026"]').first();

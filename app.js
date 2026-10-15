@@ -95,7 +95,10 @@ let activeFilters = {
     health: true
 }; // Track which filters are active
 
-let hideWeekends = localStorage.getItem('hideWeekends') === 'true';
+// Work week (Mon-Fri) by default; Sat/Sun only when the user opts in. Stored
+// under 'showWeekends' rather than the old 'hideWeekends' key so a 'false' left
+// over from when the full week was the default doesn't override the new one.
+let hideWeekends = localStorage.getItem('showWeekends') !== 'true';
 
 // Mobile only: the monthly/YTD counts, filter toggles and weekly-average card
 // collapse behind a toggle so the grid stays above the fold. The markup ships
@@ -674,7 +677,7 @@ function clearWhatIf() {
 
 function toggleHideWeekends() {
     hideWeekends = !hideWeekends;
-    localStorage.setItem('hideWeekends', hideWeekends ? 'true' : 'false');
+    localStorage.setItem('showWeekends', hideWeekends ? 'false' : 'true');
     applyHideWeekends();
 }
 
@@ -685,11 +688,11 @@ function applyHideWeekends() {
     if (!container) return;
     if (hideWeekends) {
         container.classList.add('hide-weekends');
-        if (btn) btn.classList.add('active');
+        if (btn) btn.classList.remove('active');
         if (label) label.textContent = 'Show Weekends';
     } else {
         container.classList.remove('hide-weekends');
-        if (btn) btn.classList.remove('active');
+        if (btn) btn.classList.add('active');
         if (label) label.textContent = 'Hide Weekends';
     }
 }

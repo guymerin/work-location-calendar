@@ -18,7 +18,7 @@
     <link rel="apple-touch-icon" href="icons/icon-180.png">
     <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
     <title>Work Location Calendar</title>
-    <link rel="stylesheet" href="styles.css?v=20261014a">
+    <link rel="stylesheet" href="styles.css?v=20261015a">
     <!-- Firebase Configuration - MUST BE LOADED FIRST -->
     <script src="config.js?v=20260717a"></script>
     <!-- Firebase SDK -->
@@ -118,7 +118,7 @@
             </button>
             <button id="hideWeekendsToggle" class="filter-btn" data-filter="weekends">
                 <span class="filter-icon" aria-hidden="true">📅</span>
-                <span id="hideWeekendsLabel">Hide Weekends</span>
+                <span id="hideWeekendsLabel">Show Weekends</span>
             </button>
         </div>
 
@@ -155,7 +155,7 @@
             </button>
         </div>
 
-        <div class="calendar-container">
+        <div class="calendar-container hide-weekends">
             <div class="calendar-header" id="calendarHeader">
                 <div class="day-header">Mon</div>
                 <div class="day-header">Tue</div>
@@ -326,7 +326,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=20261014a"></script>
+    <script src="app.js?v=20261015a"></script>
 </body>
 </html>
 
